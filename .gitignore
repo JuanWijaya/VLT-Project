@@ -16,6 +16,7 @@ dist-ssr/
 
 # Environment variables & local secrets
 .env
+.env.local
 .env.*
 !.env.example
 *.local

@@ -6,10 +6,12 @@ import {
   Timer, 
   BarChart3, 
   Settings,
-  Flame,
-  Layers
+  Layers,
+  LogOut,
+  ShieldCheck
 } from 'lucide-react';
 import type { NavPage } from '../../types';
+import { useAuth } from '../../context/AuthContext';
 
 interface SidebarProps {
   currentPage: NavPage;
@@ -26,6 +28,14 @@ export const navigationItems: Array<{ id: NavPage; label: string; icon: React.El
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => {
+  const { user, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    if (window.confirm('Apakah Anda yakin ingin keluar dari sesi VLT?')) {
+      await signOut();
+    }
+  };
+
   return (
     <aside className="vlt-sidebar" aria-label="Main Navigation">
       <div className="sidebar-header">
@@ -59,19 +69,62 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
       </nav>
 
       <div className="sidebar-footer">
+        {/* User Account Info Box */}
+        {user && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '8px 10px',
+            background: 'var(--bg-subtle)',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-subtle)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+              <div style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: 'var(--primary)',
+                color: '#fff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.6875rem',
+                fontWeight: 700,
+                flexShrink: 0,
+              }}>
+                {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
+              </div>
+              <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.email}
+              </span>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="vlt-btn-icon"
+              title="Logout"
+              aria-label="Logout"
+              style={{ padding: 4 }}
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        )}
+
         <div className="foundation-badge">
           <div className="status-dot-pulse" />
           <div>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Tahap 1: Fondasi UI</div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>PRD v1.0 • Client-side</div>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Tahap 2A: Supabase Ready</div>
+            <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Auth & RLS Protected</div>
           </div>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)', padding: '0 4px' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <Flame size={13} style={{ color: 'var(--accent-amber)' }} /> MVP Self-Use
+            <ShieldCheck size={13} style={{ color: 'var(--accent-emerald)' }} /> Single-User MVP
           </span>
-          <span>v1.0.0-rc</span>
+          <span>v1.1.0-alpha</span>
         </div>
       </div>
     </aside>

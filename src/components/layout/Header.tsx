@@ -1,7 +1,8 @@
 import React from 'react';
-import { Sun, Moon, Layers, ShieldCheck } from 'lucide-react';
+import { Sun, Moon, Layers, ShieldCheck, LogOut } from 'lucide-react';
 import type { NavPage } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { navigationItems } from './Sidebar';
 
 interface HeaderProps {
@@ -10,7 +11,17 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ currentPage }) => {
   const { resolvedTheme, toggleTheme } = useTheme();
+  const { user, signOut } = useAuth();
   const currentItem = navigationItems.find((item) => item.id === currentPage);
+
+  const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'V';
+  const displayEmail = user?.email || 'Self-Use Mode';
+
+  const handleLogout = async () => {
+    if (window.confirm('Apakah Anda yakin ingin keluar dari sesi VLT?')) {
+      await signOut();
+    }
+  };
 
   return (
     <header className="vlt-header">
@@ -35,9 +46,11 @@ export const Header: React.FC<HeaderProps> = ({ currentPage }) => {
 
       <div className="header-right">
         {/* Status pill: Personal Self-Use */}
-        <div className="user-status-pill" title="Target Pengguna: Single User / Self-Use (PRD Bagian 4)">
+        <div className="user-status-pill" title={`Terautentikasi: ${displayEmail}`}>
           <ShieldCheck size={14} style={{ color: 'var(--accent-emerald)' }} />
-          <span>Self-Use Mode</span>
+          <span style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {user?.email ? user.email.split('@')[0] : 'Self-Use'}
+          </span>
         </div>
 
         {/* Theme Toggle Button */}
@@ -53,10 +66,21 @@ export const Header: React.FC<HeaderProps> = ({ currentPage }) => {
         {/* User Pill */}
         <div 
           className="user-avatar"
-          title="Pengguna Personal VLT"
+          title={`Akun: ${displayEmail}`}
         >
-          V
+          {userInitial}
         </div>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="vlt-btn-icon"
+          title="Keluar dari akun (Logout)"
+          aria-label="Logout"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <LogOut size={18} />
+        </button>
       </div>
     </header>
   );
