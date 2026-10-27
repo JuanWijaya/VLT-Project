@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CheckCircle2, 
   Clock, 
@@ -6,13 +6,15 @@ import {
   BookOpen, 
   ArrowRight, 
   Flame, 
-  Timer, 
   Info,
   Sparkles
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
+import { useAuth } from '../context/AuthContext';
+import { fetchUserCourses } from '../lib/roadmap/service';
+import type { EnrichedCourse } from '../lib/roadmap/types';
 import type { NavPage } from '../types';
 
 interface DashboardPageProps {
@@ -20,16 +22,39 @@ interface DashboardPageProps {
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
+  const { user } = useAuth();
+  const [courses, setCourses] = useState<EnrichedCourse[]>([]);
+  const [loadingCourses, setLoadingCourses] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (!user) return;
+    let isMounted = true;
+    fetchUserCourses(user.id)
+      .then((data) => {
+        if (isMounted) setCourses(data);
+      })
+      .catch((err) => {
+        console.error('[VLT Dashboard] Error loading courses:', err);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCourses(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Foundation Phase Notice Banner */}
       <div className="vlt-banner vlt-banner-info">
         <Info size={20} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>Tahap 1: Fondasi UI VLT Aktif</div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>Tahap 2B: Learning Management Aktif</div>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Struktur navigasi, layout responsif, dan preferensi tema lokal sudah siap. Sesuai batasan Tahap 1, 
-            koneksi Supabase dan database belum dihubungkan serta tidak ada data palsu yang disimulasikan dari backend.
+            Pengelolaan roadmap course dan lesson melalui impor JSON v1.0 telah terhubung ke Supabase dengan perlindungan RLS.
+            Sesuai batasan PRD, modul Calendar, Focus Room, dan Analytics akan dihubungkan di tahap selanjutnya.
           </p>
         </div>
       </div>
@@ -63,12 +88,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </div>
 
         <button
-          onClick={() => onNavigate('focus')}
+          onClick={() => onNavigate('learning')}
           className="vlt-btn vlt-btn-primary"
           style={{ padding: '12px 22px', fontSize: '0.9375rem' }}
         >
-          <Timer size={18} />
-          <span>Mulai Sesi Pomodoro</span>
+          <BookOpen size={18} />
+          <span>Buka My Learning</span>
           <ArrowRight size={16} />
         </button>
       </div>
@@ -93,7 +118,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
               </div>
               <div>
                 <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Prioritas Hari Ini</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-01 • Rumus Skor Deterministiik</span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-01 • Rumus Skor Deterministik</span>
               </div>
             </div>
             <Badge variant="subtle">0/0 Selesai</Badge>
@@ -102,7 +127,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           <EmptyState
             icon={<CheckCircle2 size={24} />}
             title="Belum ada prioritas aktif"
-            description="Prioritas belajar dihitung otomatis dari jadwal hari ini, deadline mendekat, dan status lesson setelah roadmap diimpor."
+            description="Prioritas belajar dihitung otomatis di Tahap 3 (Planning) berdasarkan jadwal hari ini, deadline mendekat, dan status lesson."
             action={{
               label: "Buka My Learning",
               onClick: () => onNavigate('learning')
@@ -169,18 +194,62 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-03 • Berdasarkan Lesson Selesai</span>
               </div>
             </div>
-            <Badge variant="emerald">0 Course</Badge>
+            <Badge variant="emerald">{courses.length} Course</Badge>
           </div>
 
-          <EmptyState
-            icon={<BookOpen size={24} />}
-            title="Belum ada course terdaftar"
-            description="Course baru hanya dibuat via impor file JSON roadmap berversi 1.0 (tidak ada form manual)."
-            action={{
-              label: "Impor Roadmap",
-              onClick: () => onNavigate('learning')
-            }}
-          />
+          {loadingCourses ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8125rem' }}>
+              Memuat data course...
+            </div>
+          ) : courses.length === 0 ? (
+            <EmptyState
+              icon={<BookOpen size={24} />}
+              title="Belum ada course terdaftar"
+              description="Course baru hanya dibuat via impor file JSON roadmap berversi 1.0 (tidak ada form manual)."
+              action={{
+                label: "Impor Roadmap",
+                onClick: () => onNavigate('learning')
+              }}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {courses.slice(0, 3).map((c) => (
+                <div key={c.id} style={{
+                  padding: '12px 14px',
+                  background: 'var(--bg-subtle)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {c.title}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                      {c.completedLessons} dari {c.totalLessons} lesson selesai
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--primary)' }}>
+                      {c.progressPercentage}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              <button
+                onClick={() => onNavigate('learning')}
+                className="vlt-btn vlt-btn-subtle vlt-btn-sm"
+                style={{ width: '100%', marginTop: 4 }}
+              >
+                <span>Lihat Seluruh Roadmap ({courses.length})</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          )}
         </Card>
 
         {/* Ringkasan Waktu Fokus Terbaru (FR-DASH-04) */}

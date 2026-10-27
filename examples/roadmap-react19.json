@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "course": {
+    "id": "crs-react-19-mastery",
+    "title": "React 19 & Next-Gen Patterns",
+    "description": "Roadmap pembelajaran mendalam fitur React 19: Actions, Server Components, useOptimistic, dan Suspense."
+  },
+  "lessons": [
+    {
+      "id": "lsn-r19-001",
+      "title": "Fondasi React 19: useActionState & Server Functions",
+      "order": 1,
+      "referenceUrl": "https://react.dev/reference/rsc/server-functions"
+    },
+    {
+      "id": "lsn-r19-002",
+      "title": "Optimistic UI dengan useOptimistic Hook",
+      "order": 2,
+      "referenceUrl": "https://react.dev/reference/react/useOptimistic"
+    },
+    {
+      "id": "lsn-r19-003",
+      "title": "Form Handling Modern dengan useFormStatus",
+      "order": 3,
+      "referenceUrl": "https://react.dev/reference/react-dom/hooks/useFormStatus"
+    },
+    {
+      "id": "lsn-r19-004",
+      "title": "Metadata dan Resource Preloading API",
+      "order": 4,
+      "referenceUrl": "https://react.dev/blog/2024/04/25/react-19"
+    }
+  ]
+}
