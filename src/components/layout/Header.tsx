@@ -1,0 +1,63 @@
+import React from 'react';
+import { Sun, Moon, Layers, ShieldCheck } from 'lucide-react';
+import type { NavPage } from '../../types';
+import { useTheme } from '../../context/ThemeContext';
+import { navigationItems } from './Sidebar';
+
+interface HeaderProps {
+  currentPage: NavPage;
+}
+
+export const Header: React.FC<HeaderProps> = ({ currentPage }) => {
+  const { resolvedTheme, toggleTheme } = useTheme();
+  const currentItem = navigationItems.find((item) => item.id === currentPage);
+
+  return (
+    <header className="vlt-header">
+      <div className="header-left">
+        {/* Mobile brand presentation */}
+        <div className="header-mobile-brand">
+          <div className="brand-icon-box" style={{ width: 32, height: 32, borderRadius: 8 }}>
+            <Layers size={17} />
+          </div>
+          <div>
+            <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-primary)' }}>VLT</span>
+            <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', marginLeft: 6 }}>{currentItem?.label}</span>
+          </div>
+        </div>
+
+        {/* Desktop title presentation */}
+        <div className="header-title-wrapper">
+          <h1 className="header-page-title">{currentItem?.label || 'Dashboard'}</h1>
+          <span className="header-page-subtitle">{currentItem?.description}</span>
+        </div>
+      </div>
+
+      <div className="header-right">
+        {/* Status pill: Personal Self-Use */}
+        <div className="user-status-pill" title="Target Pengguna: Single User / Self-Use (PRD Bagian 4)">
+          <ShieldCheck size={14} style={{ color: 'var(--accent-emerald)' }} />
+          <span>Self-Use Mode</span>
+        </div>
+
+        {/* Theme Toggle Button */}
+        <button
+          onClick={toggleTheme}
+          className="theme-toggle-btn"
+          aria-label={`Ganti ke tema ${resolvedTheme === 'dark' ? 'terang' : 'gelap'}`}
+          title={`Tema saat ini: ${resolvedTheme === 'dark' ? 'Gelap (Dark)' : 'Terang (Light)'}. Klik untuk beralih.`}
+        >
+          {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
+        {/* User Pill */}
+        <div 
+          className="user-avatar"
+          title="Pengguna Personal VLT"
+        >
+          V
+        </div>
+      </div>
+    </header>
+  );
+};
