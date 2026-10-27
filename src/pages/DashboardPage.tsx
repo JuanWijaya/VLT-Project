@@ -7,14 +7,17 @@ import {
   ArrowRight, 
   Flame, 
   Info,
-  Sparkles
+  Sparkles,
+  Target
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
 import { useAuth } from '../context/AuthContext';
 import { fetchUserCourses } from '../lib/roadmap/service';
+import { fetchSchedules, fetchDeadlines, formatTimeLocal, formatDateToLocalKey } from '../lib/calendar/service';
 import type { EnrichedCourse } from '../lib/roadmap/types';
+import type { ScheduleItem, DeadlineItem } from '../types/calendar';
 import type { NavPage } from '../types';
 
 interface DashboardPageProps {
@@ -25,19 +28,34 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
   const [courses, setCourses] = useState<EnrichedCourse[]>([]);
   const [loadingCourses, setLoadingCourses] = useState<boolean>(true);
+  const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
+  const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
+  const [loadingCalendar, setLoadingCalendar] = useState<boolean>(true);
 
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
-    fetchUserCourses(user.id)
-      .then((data) => {
-        if (isMounted) setCourses(data);
+    
+    Promise.all([
+      fetchUserCourses(user.id),
+      fetchSchedules(user.id),
+      fetchDeadlines(user.id)
+    ])
+      .then(([coursesData, schedulesData, deadlinesData]) => {
+        if (isMounted) {
+          setCourses(coursesData);
+          setSchedules(schedulesData);
+          setDeadlines(deadlinesData);
+        }
       })
       .catch((err) => {
-        console.error('[VLT Dashboard] Error loading courses:', err);
+        console.error('[VLT Dashboard] Error loading dashboard data:', err);
       })
       .finally(() => {
-        if (isMounted) setLoadingCourses(false);
+        if (isMounted) {
+          setLoadingCourses(false);
+          setLoadingCalendar(false);
+        }
       });
 
     return () => {
@@ -45,16 +63,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     };
   }, [user]);
 
+  // Today key and upcoming items
+  const todayKey = formatDateToLocalKey(new Date());
+  const todaySchedules = schedules.filter(s => formatDateToLocalKey(new Date(s.startTime)) === todayKey);
+  const upcomingDeadlines = deadlines.filter(d => d.status === 'pending').slice(0, 3);
+  const activeItemsCount = todaySchedules.length + upcomingDeadlines.length;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Foundation Phase Notice Banner */}
       <div className="vlt-banner vlt-banner-info">
         <Info size={20} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>Tahap 2B: Learning Management Aktif</div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>Tahap 3: Calendar & Planning Aktif</div>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Pengelolaan roadmap course dan lesson melalui impor JSON v1.0 telah terhubung ke Supabase dengan perlindungan RLS.
-            Sesuai batasan PRD, modul Calendar, Focus Room, dan Analytics akan dihubungkan di tahap selanjutnya.
+            Perencanaan jadwal belajar dan target deadline independen telah terhubung ke Supabase dengan perlindungan RLS.
+            Sesuai batasan PRD, Focus Room dan Analytics akan dihubungkan pada tahap selanjutnya.
           </p>
         </div>
       </div>
@@ -156,18 +180,127 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-02 • Rencana vs Target</span>
               </div>
             </div>
-            <Badge variant="subtle">Agenda</Badge>
+            <Badge variant={activeItemsCount > 0 ? "primary" : "subtle"}>
+              {activeItemsCount} Item
+            </Badge>
           </div>
 
-          <EmptyState
-            icon={<Calendar size={24} />}
-            title="Tidak ada jadwal hari ini"
-            description="Jadwal belajar dan target deadline disimpan terpisah untuk menjaga kejelasan antara rencana dan komitmen."
-            action={{
-              label: "Atur di Calendar",
-              onClick: () => onNavigate('calendar')
-            }}
-          />
+          {loadingCalendar ? (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8125rem' }}>
+              Memuat agenda...
+            </div>
+          ) : activeItemsCount === 0 ? (
+            <EmptyState
+              icon={<Calendar size={24} />}
+              title="Tidak ada jadwal hari ini"
+              description="Jadwal belajar dan target deadline disimpan terpisah untuk menjaga kejelasan antara rencana dan komitmen."
+              action={{
+                label: "Atur di Calendar",
+                onClick: () => onNavigate('calendar')
+              }}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {/* Schedules */}
+              {todaySchedules.map((s) => (
+                <div
+                  key={`dash-s-${s.id}`}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)',
+                    borderLeft: '3px solid var(--primary)',
+                    background: s.status === 'completed' ? 'var(--bg-subtle)' : 'var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: '0.8125rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        textDecoration: s.status === 'completed' ? 'line-through' : 'none',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {s.title}
+                      </span>
+                      <Badge variant="primary" style={{ fontSize: '0.6875rem', padding: '1px 6px' }}>
+                        Jadwal
+                      </Badge>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                      {formatTimeLocal(s.startTime)} - {formatTimeLocal(s.endTime)}
+                      {s.courseTitle ? ` • ${s.courseTitle}` : ''}
+                    </span>
+                  </div>
+                  {s.status === 'completed' ? (
+                    <Badge variant="emerald" style={{ fontSize: '0.6875rem' }}>Selesai</Badge>
+                  ) : (
+                    <Badge variant="subtle" style={{ fontSize: '0.6875rem' }}>Hari Ini</Badge>
+                  )}
+                </div>
+              ))}
+
+              {/* Deadlines */}
+              {upcomingDeadlines.map((d) => (
+                <div
+                  key={`dash-d-${d.id}`}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)',
+                    borderLeft: '3px solid var(--accent-rose, #f43f5e)',
+                    background: d.status === 'completed' ? 'var(--bg-subtle)' : 'var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                    fontSize: '0.8125rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {d.title}
+                      </span>
+                      <Badge variant="rose" icon={<Target size={10} />} style={{ fontSize: '0.6875rem', padding: '1px 6px' }}>
+                        Deadline
+                      </Badge>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                      Batas: {formatDateToLocalKey(new Date(d.dueDate))} {formatTimeLocal(d.dueDate)}
+                      {d.courseTitle ? ` • ${d.courseTitle}` : ''}
+                    </span>
+                  </div>
+                  <Badge variant="subtle" style={{ fontSize: '0.6875rem', color: 'var(--accent-rose, #f43f5e)' }}>
+                    Target
+                  </Badge>
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => onNavigate('calendar')}
+                className="vlt-btn vlt-btn-secondary"
+                style={{ marginTop: 4, width: '100%', fontSize: '0.75rem', padding: '6px 12px', justifyContent: 'center' }}
+              >
+                <span>Buka Kalender Lengkap</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          )}
         </Card>
       </div>
 
