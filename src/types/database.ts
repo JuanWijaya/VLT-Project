@@ -33,3 +33,20 @@ export interface LessonRow {
   created_at: string;
   updated_at: string;
 }
+
+export interface StudySessionRow {
+  id: string; // UUID
+  user_id: string;
+  course_id: string | null;
+  lesson_id: string | null;
+  title: string | null;
+  mode: 'work' | 'break' | 'long_break';
+  status: 'running' | 'paused' | 'completed' | 'cancelled';
+  target_duration_seconds: number;
+  actual_duration_seconds: number;
+  start_time: string;
+  end_time: string | null;
+  last_heartbeat_at: string;
+  created_at: string;
+  updated_at: string;
+}
