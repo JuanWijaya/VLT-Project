@@ -581,7 +581,7 @@ export const CalendarPage: React.FC = () => {
                 title="Tambah Target Deadline pada tanggal ini"
               >
                 <Plus size={14} />
-                <span>+ Deadline</span>
+                <span>Deadline</span>
               </button>
               <button
                 type="button"
@@ -594,7 +594,7 @@ export const CalendarPage: React.FC = () => {
                 title="Tambah Jadwal Belajar pada tanggal ini"
               >
                 <Plus size={14} />
-                <span>+ Jadwal</span>
+                <span>Jadwal</span>
               </button>
             </div>
           </div>

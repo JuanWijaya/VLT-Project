@@ -3,16 +3,14 @@
  * Memverifikasi ke-13 skenario uji sesuai instruksi Butir 7 PRD.
  */
 
-import { formatDateToLocalKey, formatTimeLocal } from '../src/lib/calendar/service';
+import { formatDateToLocalKey } from '../src/lib/calendar/service';
 import type { 
   ScheduleItem, 
   DeadlineItem, 
   CreateScheduleInput, 
-  CreateDeadlineInput,
-  ScheduleStatus,
-  DeadlineStatus
+  CreateDeadlineInput
 } from '../src/types/calendar';
-import type { LessonStatus } from '../src/lib/roadmap/types';
+import type { LessonStatus } from '../src/types';
 
 interface TestResult {
   scenarioNumber: number;
@@ -301,10 +299,7 @@ async function fetchWithResilientFallback(shouldFail: boolean): Promise<Schedule
     return [];
   }
 }
-let resilientHandled = false;
-fetchWithResilientFallback(true).then((items) => {
-  resilientHandled = Array.isArray(items) && items.length === 0;
-});
+void fetchWithResilientFallback(true);
 
 assert(
   true, // Handled asynchronously above

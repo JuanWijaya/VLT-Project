@@ -1,4 +1,5 @@
 import type { LessonStatus } from '../../types';
+export type { LessonStatus };
 
 // ==============================================================================
 // 1. KONTRAK ROADMAP JSON SCHEMA v1.0 (PRD Bagian 7.2 & 14.4)

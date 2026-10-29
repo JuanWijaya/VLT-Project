@@ -106,7 +106,7 @@ assert(
   res4.isValid === false && res4.errors.length >= 2,
   4,
   'Field wajib hilang atau memiliki tipe yang salah',
-  `Ditemukan ${res4.errors.length} error validasi tipe & field kosong.`
+  `Ditemukan ${!res4.isValid ? res4.errors.length : 0} error validasi tipe & field kosong.`
 );
 
 // -----------------------------------------------------------------------------
