@@ -5,17 +5,24 @@ import {
   Monitor, 
   Clock, 
   Download, 
+  Upload,
   ShieldCheck, 
   Check, 
-  Database
+  Database,
+  RefreshCw,
+  CheckCircle2
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { generateUserBackup, triggerBackupDownload } from '../lib/backup/service';
+import { RestoreModal } from '../components/backup/RestoreModal';
 import type { ThemeMode } from '../types';
 
 export const SettingsPage: React.FC = () => {
   const { theme, resolvedTheme, setTheme } = useTheme();
+  const { user } = useAuth();
 
   // Pomodoro local preference state
   const [workMinutes, setWorkMinutes] = useState<number>(() => {
@@ -37,6 +44,9 @@ export const SettingsPage: React.FC = () => {
   });
 
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [exportSuccess, setExportSuccess] = useState<boolean>(false);
+  const [isRestoreModalOpen, setIsRestoreModalOpen] = useState<boolean>(false);
 
   const handleSaveTimerPreferences = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,6 +57,22 @@ export const SettingsPage: React.FC = () => {
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    if (!user) return;
+    setIsExporting(true);
+    try {
+      const backup = await generateUserBackup(user.id);
+      triggerBackupDownload(backup);
+      setExportSuccess(true);
+      setTimeout(() => setExportSuccess(false), 3000);
+    } catch (err) {
+      console.error('[SettingsPage] Gagal membuat backup:', err);
+      alert('Gagal mengekspor data backup.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -74,7 +100,7 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         <Badge variant="primary" icon={<ShieldCheck size={13} />}>
-          Konfigurasi Lokal
+          Konfigurasi Personal
         </Badge>
       </div>
 
@@ -222,50 +248,80 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5, marginBottom: 16 }}>
-          Pengguna memegang kendali penuh atas data belajarnya. Seluruh riwayat sesi fokus, catatan course, 
-          dan agenda dapat diekspor dalam format terstandar. Modul ekspor menyeluruh akan dihubungkan pada Tahap 5 (Analytics & Stabilitas).
+          Pengguna memegang kendali penuh atas data belajarnya. Seluruh course, roadmap lesson, target deadline, jadwal kalender, 
+          dan riwayat sesi Pomodoro aktual dapat dicadangkan ke dalam file JSON terstandar (schemaVersion: "1.0").
         </p>
 
-        <button 
-          type="button" 
-          className="vlt-btn vlt-btn-secondary vlt-btn-sm"
-          onClick={() => alert("Fitur ekspor data akan aktif setelah data tersimpan terhubung di fase database.")}
-        >
-          <Download size={14} />
-          <span>Ekspor Data JSON (Tahap 5)</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <button 
+            type="button" 
+            className="vlt-btn vlt-btn-primary vlt-btn-sm"
+            onClick={handleExportBackup}
+            disabled={isExporting}
+          >
+            {isExporting ? <RefreshCw size={14} className="vlt-spin" /> : <Download size={14} />}
+            <span>{isExporting ? 'Mengekspor Data...' : 'Ekspor Data JSON (v1.0)'}</span>
+          </button>
+
+          <button 
+            type="button" 
+            className="vlt-btn vlt-btn-secondary vlt-btn-sm"
+            onClick={() => setIsRestoreModalOpen(true)}
+          >
+            <Upload size={14} />
+            <span>Pulihkan Data dari Backup</span>
+          </button>
+
+          {exportSuccess && (
+            <span style={{ fontSize: '0.8125rem', color: 'var(--accent-emerald)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <CheckCircle2 size={15} /> File backup berhasil diunduh!
+            </span>
+          )}
+        </div>
       </Card>
 
       {/* Status Arsitektur Fondasi */}
       <Card style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <Database size={18} style={{ color: 'var(--text-secondary)' }} />
+          <Database size={18} style={{ color: 'var(--accent-emerald)' }} />
           <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Status Tahapan Rilis (PRD Bagian 11)</h4>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.8125rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.8125rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-            <strong>Tahap 1 — Fondasi:</strong> UI responsif, Navigasi (6 Halaman), Light/Dark theme, TypeScript aman (Sedang Berjalan).
+            <strong>Tahap 1 — Fondasi:</strong> Autentikasi personal Supabase, UI responsif desktop & mobile, Light/Dark/Auto theme.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-tertiary)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border-medium)' }} />
-            <span>Tahap 2 — Learning Management:</span> Parser roadmap v1.0, preview & merge, status & progres.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
+            <strong>Tahap 2 — Learning Management:</strong> Parser roadmap JSON v1.0, preview & merge diff, status lesson & progres otomatis.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-tertiary)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border-medium)' }} />
-            <span>Tahap 3 — Planning:</span> Kalender, jadwal multi-lesson, deadline terpisah, prioritas harian.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
+            <strong>Tahap 3 — Planning:</strong> Kalender bulanan & agenda, form jadwal fleksibel, deadline terpisah, prioritas harian.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-tertiary)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border-medium)' }} />
-            <span>Tahap 4 — Focus Tracking:</span> Pomodoro recovery, checkpoint anti-crash, riwayat sesi.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
+            <strong>Tahap 4 — Focus Tracking:</strong> Timer Pomodoro aktual berbasis timestamp, pemulihan crash & sleep, anti-sesi ganda.
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text-tertiary)' }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--border-medium)' }} />
-            <span>Tahap 5 — Analytics & Stabilitas:</span> Grafik metrik, validasi, ekspor & backup.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
+            <strong>Tahap 5 — Analytics & Stabilitas:</strong> Metrik durasi fokus aktual, grafik distribusi harian, konsistensi, backup & pemulihan.
           </div>
         </div>
       </Card>
+
+      {/* Restore Modal */}
+      {user && (
+        <RestoreModal
+          isOpen={isRestoreModalOpen}
+          onClose={() => setIsRestoreModalOpen(false)}
+          userId={user.id}
+          onRestored={() => {
+            alert('Data backup berhasil dipulihkan. Halaman akan menyinkronkan data terbaru.');
+          }}
+        />
+      )}
     </div>
   );
 };

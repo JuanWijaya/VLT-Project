@@ -64,7 +64,7 @@ export const MainAppContent: React.FC = () => {
       case 'focus':
         return <FocusRoomPage />;
       case 'analytics':
-        return <AnalyticsPage />;
+        return <AnalyticsPage onNavigate={setCurrentPage} />;
       case 'settings':
         return <SettingsPage />;
       default:

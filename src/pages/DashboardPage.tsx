@@ -8,14 +8,28 @@ import {
   Flame, 
   Info,
   Sparkles,
-  Target
+  Target,
+  ChevronUp,
+  ChevronDown,
+  RotateCcw,
+  Play
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
 import { useAuth } from '../context/AuthContext';
+import { supabase } from '../lib/supabase';
 import { fetchUserCourses } from '../lib/roadmap/service';
 import { fetchSchedules, fetchDeadlines, formatTimeLocal, formatDateToLocalKey } from '../lib/calendar/service';
+import { 
+  evaluateLessonPriority, 
+  sortPrioritiesWithManualOrder, 
+  getStoredManualOrder, 
+  saveStoredManualOrder, 
+  clearStoredManualOrder,
+  type LessonForPriority 
+} from '../lib/priorities/service';
+import type { DailyPriorityItem } from '../types/priorities';
 import type { EnrichedCourse } from '../lib/roadmap/types';
 import type { ScheduleItem, DeadlineItem } from '../types/calendar';
 import type { NavPage } from '../types';
@@ -32,21 +46,87 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState<boolean>(true);
 
+  // Daily Priorities state
+  const [priorityItems, setPriorityItems] = useState<DailyPriorityItem[]>([]);
+  const [manualOrderIds, setManualOrderIds] = useState<string[] | null>(null);
+
+  // Today Focus Stats state
+  const [todayFocusMinutes, setTodayFocusMinutes] = useState<number>(0);
+  const [todaySessionCount, setTodaySessionCount] = useState<number>(0);
+
+  const todayKey = formatDateToLocalKey(new Date());
+
   useEffect(() => {
     if (!user) return;
     let isMounted = true;
-    
+
+    // Load manual order from localStorage
+    const storedOrder = getStoredManualOrder(user.id);
+    if (storedOrder) setManualOrderIds(storedOrder);
+
     Promise.all([
       fetchUserCourses(user.id),
       fetchSchedules(user.id),
-      fetchDeadlines(user.id)
+      fetchDeadlines(user.id),
+      // Fetch lessons for priority evaluation
+      supabase.from('lessons').select('id, course_id, title, status, updated_at').eq('user_id', user.id),
+      // Fetch study sessions for today's focus metrics
+      supabase.from('study_sessions').select('mode, status, actual_duration_seconds, start_time').eq('user_id', user.id),
     ])
-      .then(([coursesData, schedulesData, deadlinesData]) => {
-        if (isMounted) {
-          setCourses(coursesData);
-          setSchedules(schedulesData);
-          setDeadlines(deadlinesData);
+      .then(([coursesData, schedulesData, deadlinesData, lessonsRes, sessionsRes]) => {
+        if (!isMounted) return;
+
+        setCourses(coursesData);
+        setSchedules(schedulesData);
+        setDeadlines(deadlinesData);
+
+        // 1. Process Lessons into Priority Items
+        const courseTitleMap = new Map<string, string>();
+        coursesData.forEach((c) => courseTitleMap.set(c.id, c.title));
+
+        const rawLessons = lessonsRes.data || [];
+        const lessonsForPriority: LessonForPriority[] = rawLessons.map((l: any) => ({
+          id: l.id,
+          courseId: l.course_id,
+          courseTitle: courseTitleMap.get(l.course_id) || 'Course',
+          title: l.title,
+          status: l.status,
+          updatedAt: l.updated_at,
+        }));
+
+        const now = new Date();
+        const evaluated: DailyPriorityItem[] = [];
+        for (const l of lessonsForPriority) {
+          const item = evaluateLessonPriority(l, schedulesData, deadlinesData, now);
+          if (item) evaluated.push(item);
         }
+
+        const sorted = sortPrioritiesWithManualOrder(evaluated, storedOrder);
+        setPriorityItems(sorted);
+
+        // 2. Process Today's Focus Metrics
+        let sessions = sessionsRes.data || [];
+        if (!sessions || sessions.length === 0) {
+          try {
+            const raw = localStorage.getItem(`vlt-focus-sessions-${user.id}`);
+            if (raw) sessions = JSON.parse(raw);
+          } catch {}
+        }
+
+        let todaySecs = 0;
+        let todayCount = 0;
+        (sessions || []).forEach((s: any) => {
+          if (s.mode === 'work' && s.status !== 'cancelled' && s.actual_duration_seconds > 0) {
+            const dateKey = formatDateToLocalKey(new Date(s.start_time));
+            if (dateKey === todayKey) {
+              todaySecs += s.actual_duration_seconds;
+              todayCount += 1;
+            }
+          }
+        });
+
+        setTodayFocusMinutes(Math.round(todaySecs / 60));
+        setTodaySessionCount(todayCount);
       })
       .catch((err) => {
         console.error('[VLT Dashboard] Error loading dashboard data:', err);
@@ -61,24 +141,47 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     return () => {
       isMounted = false;
     };
-  }, [user]);
+  }, [user, todayKey]);
 
-  // Today key and upcoming items
-  const todayKey = formatDateToLocalKey(new Date());
+  // Reordering handlers for Daily Priorities
+  const handleMovePriority = (index: number, direction: 'up' | 'down') => {
+    if (!user) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= priorityItems.length) return;
+
+    const newItems = [...priorityItems];
+    const temp = newItems[index];
+    newItems[index] = newItems[targetIndex];
+    newItems[targetIndex] = temp;
+
+    const newOrderIds = newItems.map((item) => item.id);
+    setPriorityItems(newItems);
+    setManualOrderIds(newOrderIds);
+    saveStoredManualOrder(user.id, newOrderIds);
+  };
+
+  const handleResetManualOrder = () => {
+    if (!user) return;
+    clearStoredManualOrder(user.id);
+    setManualOrderIds(null);
+    const sorted = sortPrioritiesWithManualOrder(priorityItems, null);
+    setPriorityItems(sorted);
+  };
+
+  // Today key and upcoming calendar items
   const todaySchedules = schedules.filter(s => formatDateToLocalKey(new Date(s.startTime)) === todayKey);
   const upcomingDeadlines = deadlines.filter(d => d.status === 'pending').slice(0, 3);
   const activeItemsCount = todaySchedules.length + upcomingDeadlines.length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      {/* Foundation Phase Notice Banner */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 40 }}>
+      {/* Complete VLT System Notice Banner */}
       <div className="vlt-banner vlt-banner-info">
         <Info size={20} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>Tahap 3: Calendar & Planning Aktif</div>
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>VLT MVP Lengkap & Aktif (Plan • Execute • Track)</div>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Perencanaan jadwal belajar dan target deadline independen telah terhubung ke Supabase dengan perlindungan RLS.
-            Sesuai batasan PRD, Focus Room dan Analytics akan dihubungkan pada tahap selanjutnya.
+            Seluruh alur belajar terpadu dari Roadmap JSON, Kalender Jadwal, Focus Pomodoro, Prioritas Harian, hingga Analytics objektif dan Ekspor Backup telah terhubung.
           </p>
         </div>
       </div>
@@ -100,7 +203,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <Badge variant="primary" icon={<Sparkles size={12} />}>
               Personal Learning Workspace
             </Badge>
-            <span style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>MVP v1.0</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>MVP v1.0 • Siap Digunakan</span>
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>
             Selamat Datang di VLT
@@ -124,9 +227,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
       {/* Main Grid: Prioritas Harian & Jadwal */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-        {/* Prioritas Harian (FR-DASH-01, FR-DASH-06) */}
+        {/* Prioritas Harian (FR-DASH-01, FR-DASH-06 & PRD 14.2) */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
                 width: 32,
@@ -141,22 +244,153 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <Flame size={18} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Prioritas Hari Ini</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-01 • Rumus Skor Deterministik</span>
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>Prioritas Hari Ini</h3>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                  FR-DASH-01 • {manualOrderIds ? 'Urutan Manual (Kustom)' : 'Rekomendasi Skor Deterministik (Maks 100)'}
+                </span>
               </div>
             </div>
-            <Badge variant="subtle">0/0 Selesai</Badge>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {manualOrderIds && (
+                <button
+                  type="button"
+                  onClick={handleResetManualOrder}
+                  className="vlt-btn vlt-btn-subtle vlt-btn-sm"
+                  style={{ fontSize: '0.6875rem', padding: '2px 8px' }}
+                  title="Kembalikan ke urutan rekomendasi skor otomatis"
+                >
+                  <RotateCcw size={11} />
+                  <span>Reset Urutan</span>
+                </button>
+              )}
+              <Badge variant={priorityItems.length > 0 ? "amber" : "subtle"}>
+                {priorityItems.length} Aktif
+              </Badge>
+            </div>
           </div>
 
-          <EmptyState
-            icon={<CheckCircle2 size={24} />}
-            title="Belum ada prioritas aktif"
-            description="Prioritas belajar dihitung otomatis di Tahap 3 (Planning) berdasarkan jadwal hari ini, deadline mendekat, dan status lesson."
-            action={{
-              label: "Buka My Learning",
-              onClick: () => onNavigate('learning')
-            }}
-          />
+          {priorityItems.length === 0 ? (
+            <EmptyState
+              icon={<CheckCircle2 size={24} />}
+              title="Semua materi aktif telah selesai"
+              description="Tidak ada materi berstatus sedang dipelajari atau belum dimulai. Impor roadmap baru di My Learning untuk melanjutkan belajar."
+              action={{
+                label: "Buka My Learning",
+                onClick: () => onNavigate('learning')
+              }}
+            />
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {priorityItems.slice(0, 5).map((item, idx) => (
+                <div
+                  key={`prio-${item.id}`}
+                  style={{
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-subtle)',
+                    borderLeft: `4px solid ${item.scores.totalScore >= 60 ? 'var(--accent-amber)' : 'var(--primary)'}`,
+                    background: 'var(--bg-surface)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}
+                >
+                  {/* Reorder Buttons (PRD 14.2) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <button
+                      type="button"
+                      disabled={idx === 0}
+                      onClick={() => handleMovePriority(idx, 'up')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 1,
+                        cursor: idx === 0 ? 'not-allowed' : 'pointer',
+                        color: idx === 0 ? 'var(--border-medium)' : 'var(--text-tertiary)',
+                        lineHeight: 1,
+                      }}
+                      title="Geser Prioritas Naik"
+                    >
+                      <ChevronUp size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={idx === priorityItems.length - 1}
+                      onClick={() => handleMovePriority(idx, 'down')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 1,
+                        cursor: idx === priorityItems.length - 1 ? 'not-allowed' : 'pointer',
+                        color: idx === priorityItems.length - 1 ? 'var(--border-medium)' : 'var(--text-tertiary)',
+                        lineHeight: 1,
+                      }}
+                      title="Geser Prioritas Turun"
+                    >
+                      <ChevronDown size={15} />
+                    </button>
+                  </div>
+
+                  {/* Lesson Info & Badges */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
+                        color: 'var(--text-primary)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: 240,
+                      }}>
+                        {item.lessonTitle}
+                      </span>
+
+                      {item.urgencyLabel && (
+                        <Badge 
+                          variant={item.closestDeadline?.isOverdue ? 'rose' : item.hasScheduleToday ? 'primary' : 'amber'}
+                          style={{ fontSize: '0.6875rem', padding: '1px 6px' }}
+                        >
+                          {item.urgencyLabel}
+                        </Badge>
+                      )}
+
+                      <Badge variant="subtle" style={{ fontSize: '0.6875rem', padding: '1px 6px' }}>
+                        {item.status === 'in_progress' ? 'Sedang Dipelajari' : 'Belum Dimulai'}
+                      </Badge>
+                    </div>
+
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                      📚 {item.courseTitle} • Skor: <strong>{item.scores.totalScore} pts</strong>
+                      <span style={{ marginLeft: 6, fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>
+                        (D:{item.scores.scoreDeadline} J:{item.scores.scoreSchedule} S:{item.scores.scoreStatus})
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Quick Action: Focus Room */}
+                  <button
+                    type="button"
+                    onClick={() => onNavigate('focus')}
+                    className="vlt-btn vlt-btn-secondary vlt-btn-sm"
+                    style={{ fontSize: '0.75rem', padding: '5px 10px', flexShrink: 0 }}
+                    title="Mulai Sesi Fokus untuk materi ini"
+                  >
+                    <Play size={12} />
+                    <span>Fokus</span>
+                  </button>
+                </div>
+              ))}
+
+              {priorityItems.length > 5 && (
+                <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                  +{priorityItems.length - 5} materi aktif lainnya dalam prioritas
+                </div>
+              )}
+            </div>
+          )}
         </Card>
 
         {/* Jadwal & Deadline Terdekat (FR-DASH-02) */}
@@ -304,7 +538,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </Card>
       </div>
 
-      {/* Secondary Grid: Progres Course & Waktu Fokus */}
+      {/* Secondary Grid: Progres Course & Waktu Fokus Hari Ini */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
         {/* Ringkasan Progres Course (FR-DASH-03) */}
         <Card>
@@ -385,7 +619,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           )}
         </Card>
 
-        {/* Ringkasan Waktu Fokus Terbaru (FR-DASH-04) */}
+        {/* Ringkasan Waktu Fokus Hari Ini Aktual (FR-DASH-04) */}
         <Card>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -406,7 +640,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-04 • Durasi Aktual Bersih</span>
               </div>
             </div>
-            <Badge variant="subtle">0m Tercatat</Badge>
+            <Badge variant={todayFocusMinutes > 0 ? "primary" : "subtle"}>
+              {todayFocusMinutes}m Tercatat
+            </Badge>
           </div>
 
           <div style={{
@@ -420,19 +656,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             border: '1px solid var(--border-subtle)',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
-              0 <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-tertiary)' }}>menit</span>
+            <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+              {todayFocusMinutes} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-tertiary)' }}>menit</span>
             </div>
             <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-              Hanya durasi fokus nyata yang dihitung. Waktu istirahat dan jeda tidak dimasukkan ke total.
+              {todaySessionCount > 0 
+                ? `Tercatat dari ${todaySessionCount} sesi fokus Pomodoro hari ini. Waktu jeda dan istirahat tidak dihitung.`
+                : 'Belum ada sesi fokus yang tercatat hari ini. Mulai sesi Pomodoro pertama Anda di Focus Room.'}
             </p>
-            <button 
-              onClick={() => onNavigate('focus')}
-              className="vlt-btn vlt-btn-secondary vlt-btn-sm" 
-              style={{ marginTop: 14 }}
-            >
-              Masuk ke Focus Room
-            </button>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button 
+                onClick={() => onNavigate('focus')}
+                className="vlt-btn vlt-btn-primary vlt-btn-sm" 
+              >
+                <Play size={14} />
+                <span>Masuk ke Focus Room</span>
+              </button>
+              <button 
+                onClick={() => onNavigate('analytics')}
+                className="vlt-btn vlt-btn-secondary vlt-btn-sm" 
+              >
+                <span>Lihat Analitik Lengkap</span>
+                <ArrowRight size={14} />
+              </button>
+            </div>
           </div>
         </Card>
       </div>
