@@ -346,13 +346,15 @@ const invalidBackupNoSchema = JSON.stringify({
   data: { courses: [], lessons: [] }
 });
 const valResNoSchema = validateBackupFile(invalidBackupNoSchema);
+const errors11 = !valResNoSchema.isValid ? valResNoSchema.errors : [];
 
 assert(
-  valResNoSchema.isValid === false &&
-  valResNoSchema.errors[0].includes('schemaVersion'),
+  !valResNoSchema.isValid &&
+  errors11.length > 0 &&
+  errors11[0].includes('schemaVersion'),
   11,
   'Validasi file backup menolak file tanpa schemaVersion',
-  valResNoSchema.isValid ? 'Gagal menolak' : valResNoSchema.errors[0]
+  errors11[0] || 'Gagal menolak'
 );
 
 // -----------------------------------------------------------------------------
@@ -364,13 +366,15 @@ const invalidBackupV2 = JSON.stringify({
   data: { courses: [], lessons: [], schedules: [], deadlines: [], studySessions: [] }
 });
 const valResV2 = validateBackupFile(invalidBackupV2);
+const errors12 = !valResV2.isValid ? valResV2.errors : [];
 
 assert(
-  valResV2.isValid === false &&
-  valResV2.errors[0].includes('hanya mendukung "1.0"'),
+  !valResV2.isValid &&
+  errors12.length > 0 &&
+  errors12[0].includes('hanya mendukung "1.0"'),
   12,
   'Validasi file backup menolak schemaVersion yang lebih baru dari "1.0"',
-  valResV2.isValid ? 'Gagal menolak' : valResV2.errors[0]
+  errors12[0] || 'Gagal menolak'
 );
 
 // -----------------------------------------------------------------------------
