@@ -6,7 +6,6 @@ import {
   BookOpen, 
   ArrowRight, 
   Flame, 
-  Info,
   Sparkles,
   Target,
   ChevronUp,
@@ -175,17 +174,6 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 40 }}>
-      {/* Complete VLT System Notice Banner */}
-      <div className="vlt-banner vlt-banner-info">
-        <Info size={20} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 600, marginBottom: 2 }}>VLT MVP Lengkap & Aktif (Plan • Execute • Track)</div>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', margin: 0 }}>
-            Seluruh alur belajar terpadu dari Roadmap JSON, Kalender Jadwal, Focus Pomodoro, Prioritas Harian, hingga Analytics objektif dan Ekspor Backup telah terhubung.
-          </p>
-        </div>
-      </div>
-
       {/* Hero Welcome & Quick Stats */}
       <div style={{
         display: 'flex',
@@ -203,14 +191,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <Badge variant="primary" icon={<Sparkles size={12} />}>
               Personal Learning Workspace
             </Badge>
-            <span style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)' }}>MVP v1.0 • Siap Digunakan</span>
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>
             Selamat Datang di VLT
           </h2>
           <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Alur belajar terpadu untuk <strong>Plan</strong> (Roadmap & Jadwal), <strong>Execute</strong> (Focus Pomodoro), 
-            dan <strong>Track</strong> (Data Progres Aktual).
+            Alur belajar terpadu untuk <strong>Plan</strong>, <strong>Execute</strong>, dan <strong>Track</strong>.
           </p>
         </div>
 
