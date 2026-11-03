@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { Badge } from '../common/Badge';
 
 export const LoginPage: React.FC = () => {
   const { signInWithPassword, error, clearError, isConfigured } = useAuth();
@@ -88,20 +87,14 @@ export const LoginPage: React.FC = () => {
             <Layers size={28} />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Badge variant="primary" icon={<ShieldCheck size={12} />}>
-              Personal Access
-            </Badge>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 500 }}>
-              MVP v1.0
-            </span>
-          </div>
-
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
             Masuk ke VLT
           </h1>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-            Velgryn Learning Tracking • Plan • Execute • Track
+            Velgryn Learning Tracking
+          </p>
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+            Plan • Execute • Track
           </p>
         </div>
 
@@ -292,7 +285,7 @@ export const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Single-User / No Public Registration Notice (PRD Bagian 6 & 10) */}
+          {/* Single-User / Personal Access Notice */}
           <div style={{
             marginTop: 24,
             paddingTop: 18,
@@ -302,11 +295,10 @@ export const LoginPage: React.FC = () => {
             color: 'var(--text-tertiary)',
             lineHeight: 1.5,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4, fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 600, color: 'var(--text-secondary)' }}>
               <ShieldCheck size={14} style={{ color: 'var(--accent-emerald)' }} />
-              Akses Personal (Single-User MVP)
+              Akses Personal
             </div>
-            Registrasi publik dinonaktifkan. Akun pengguna dibuat langsung oleh pemilik proyek melalui Supabase Dashboard.
           </div>
         </div>
       </div>
