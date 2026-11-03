@@ -196,7 +196,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             Selamat Datang di VLT
           </h2>
           <p style={{ fontSize: '0.9375rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Alur belajar terpadu untuk <strong>Plan</strong>, <strong>Execute</strong>, dan <strong>Track</strong>.
+            Alur belajar terpadu untuk Plan, Execute, dan Track.
           </p>
         </div>
 
@@ -231,9 +231,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
               </div>
               <div>
                 <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>Prioritas Hari Ini</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                  FR-DASH-01 • {manualOrderIds ? 'Urutan Manual (Kustom)' : 'Rekomendasi Skor Deterministik (Maks 100)'}
-                </span>
+                {manualOrderIds && (
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                    Urutan Manual (Kustom)
+                  </span>
+                )}
               </div>
             </div>
 
@@ -396,8 +398,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <Calendar size={18} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Jadwal & Deadline Terdekat</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-02 • Rencana vs Target</span>
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>Jadwal & Deadline Terdekat</h3>
               </div>
             </div>
             <Badge variant={activeItemsCount > 0 ? "primary" : "subtle"}>
@@ -543,8 +544,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <BookOpen size={18} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Roadmap Course Aktif</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-03 • Berdasarkan Lesson Selesai</span>
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>Roadmap Course Aktif</h3>
               </div>
             </div>
             <Badge variant="emerald">{courses.length} Course</Badge>
@@ -622,8 +622,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                 <Clock size={18} />
               </div>
               <div>
-                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Waktu Fokus Hari Ini</h3>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>FR-DASH-04 • Durasi Aktual Bersih</span>
+                <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>Waktu Fokus Hari Ini</h3>
               </div>
             </div>
             <Badge variant={todayFocusMinutes > 0 ? "primary" : "subtle"}>
