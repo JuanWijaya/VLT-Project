@@ -105,10 +105,10 @@ Pengelolaan course dan roadmap lesson.
 | FR-FOCUS-02 | Kontrol sesi | Pause, resume, stop lebih awal |
 | FR-FOCUS-03 | Kaitan opsional | Sesi dapat dikaitkan ke course/lesson, atau berdiri sendiri |
 | FR-FOCUS-04 | Riwayat sesi | Riwayat sesi fokus tersimpan |
-| FR-FOCUS-05 | Pemulihan sesi | Sesi yang terjeda akibat halaman ditinggalkan/tertutup dapat dipulihkan |
+| FR-FOCUS-05 | Pemulihan sesi & Aktivitas Eksternal | Timer tetap berjalan saat berpindah tab/aplikasi eksternal; sesi yang terputus akibat tab tertutup total/laptop sleep dipulihkan sebagai dijeda |
 | FR-FOCUS-06 | Akurasi waktu | Durasi dihitung dari catatan waktu & status sesi, bukan hanya hitung mundur di layar |
 
-**Aturan tambahan:** waktu istirahat/jeda tidak dihitung fokus; sesi dihentikan lebih awal tetap menyimpan durasi valid yang sudah dijalani; sesi dibatalkan tanpa durasi valid tidak dihitung; status disimpan berkala (tidak hanya bergantung event penutupan); sesi lintas jam/tengah malam dibagi ke jam/tanggal yang sesuai; durasi yang sama tidak dihitung dua kali; jika penutupan mendadak gagal tersimpan, aplikasi memulihkan data terakhir yang aman dan menghindari durasi yang tidak dapat dipercaya.
+**Aturan tambahan:** berpindah tab atau membuka aplikasi lain (seperti video materi, browser dokumentasi, atau editor kode) **tidak menjeda** timer Pomodoro (timer terus berjalan normal di background); waktu istirahat/jeda tidak dihitung fokus; sesi dihentikan lebih awal tetap menyimpan durasi valid yang sudah dijalani; sesi dibatalkan tanpa durasi valid tidak dihitung; status disimpan berkala (tidak hanya bergantung event penutupan); sesi lintas jam/tengah malam dibagi ke jam/tanggal yang sesuai; durasi yang sama tidak dihitung dua kali; jika penutupan mendadak gagal tersimpan, aplikasi memulihkan data terakhir yang aman dan menghindari durasi yang tidak dapat dipercaya.
 
 ### 7.5 Analytics (FR-ANA)
 
@@ -290,10 +290,11 @@ Skor total maksimum = 100.
 - "Relevansi terhadap rencana belajar" yang disebut pada brief awal belum punya rumus tersendiri — apakah digabung ke Skor\_StatusLesson atau menjadi komponen kelima terpisah di versi berikutnya.
 - Apakah skor dihitung ulang penuh setiap Dashboard dibuka, atau disimpan sebagai snapshot harian.
 
-### 14.3 Sesi Pomodoro Multi-Perangkat
+### 14.3 Sesi Pomodoro Multi-Perangkat & Pelacakan Latar Belakang
 
 **Business rules:**
 
+- Berpindah tab atau meminimalkan browser (tab VLT di latar belakang saat pengguna belajar di tab materi atau aplikasi lain seperti VS Code) **TETAP BERJALAN** (*running*). Timer Pomodoro terus menghitung waktu belajar pengguna secara real-time berdasarkan selisih waktu nyata (*wall-clock time*), dan judul tab browser menampilkan hitung mundur waktu tersisa.
 - Satu akun hanya boleh memiliki satu sesi fokus aktif pada satu waktu; status "berjalan" maupun "dijeda" sama-sama dihitung sebagai sesi aktif.
 - Status sesi yang tersimpan di server adalah satu-satunya sumber kebenaran (source of truth); timer di perangkat hanyalah tampilan dari status server, bukan sumber hitung independen.
 - Perangkat kedua yang dibuka saat sudah ada sesi aktif di server WAJIB menampilkan sesi yang sedang berjalan tersebut (sisa waktu, status), bukan menawarkan untuk memulai sesi baru.

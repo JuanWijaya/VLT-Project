@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   History,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Bell
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
@@ -37,6 +38,8 @@ export const FocusRoomPage: React.FC = () => {
     liveActualSeconds,
     loadingActive,
     recentSessions,
+    notificationPermission,
+    requestNotificationPermission,
     startSession,
     pauseSession,
     resumeSession,
@@ -571,21 +574,76 @@ export const FocusRoomPage: React.FC = () => {
           )}
         </div>
 
-        {/* Live Actual Focus Counter */}
+        {/* Live Actual Focus Counter & Background Status */}
         {activeSession && (
           <div style={{
             marginTop: 28,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
-            gap: 8,
-            fontSize: '0.8125rem',
-            color: 'var(--text-secondary)',
+            gap: 10,
           }}>
-            <Clock size={15} style={{ color: 'var(--primary)' }} />
-            <span>
-              Fokus aktual yang sudah tercatat: <strong>{Math.floor(liveActualSeconds / 60)}m {liveActualSeconds % 60}s</strong>
-            </span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: '0.8125rem',
+              color: 'var(--text-secondary)',
+            }}>
+              <Clock size={15} style={{ color: 'var(--primary)' }} />
+              <span>
+                Fokus aktual yang sudah tercatat: <strong>{Math.floor(liveActualSeconds / 60)}m {liveActualSeconds % 60}s</strong>
+              </span>
+            </div>
+
+            {activeSession.status === 'running' && (
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: '0.75rem',
+                color: 'var(--accent-emerald)',
+                background: 'rgba(16, 185, 129, 0.1)',
+                padding: '5px 14px',
+                borderRadius: 'var(--radius-full)',
+                fontWeight: 500,
+              }}>
+                <span className="status-dot-pulse" style={{ width: 7, height: 7, background: 'var(--accent-emerald)' }} />
+                <span>Timer tetap aktif di latar belakang saat Anda berpindah tab atau membuka aplikasi lain</span>
+              </div>
+            )}
+
+            {notificationPermission === 'granted' ? (
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <Bell size={13} style={{ color: 'var(--accent-emerald)' }} />
+                <span>Notifikasi desktop aktif saat sesi tuntas</span>
+              </div>
+            ) : notificationPermission === 'default' ? (
+              <button
+                type="button"
+                onClick={() => requestNotificationPermission()}
+                className="vlt-btn vlt-btn-subtle vlt-btn-xs"
+                style={{ fontSize: '0.75rem', gap: 6, display: 'inline-flex', alignItems: 'center' }}
+                title="Izinkan notifikasi desktop untuk pemberitahuan saat sesi Pomodoro selesai"
+              >
+                <Bell size={13} />
+                <span>Aktifkan Notifikasi Desktop Saat Selesai</span>
+              </button>
+            ) : null}
           </div>
+        )}
+
+        {!activeSession && notificationPermission === 'default' && (
+          <button
+            type="button"
+            onClick={() => requestNotificationPermission()}
+            className="vlt-btn vlt-btn-subtle vlt-btn-xs"
+            style={{ marginTop: 22, fontSize: '0.75rem', gap: 6, display: 'inline-flex', alignItems: 'center' }}
+            title="Dapatkan notifikasi sistem saat timer selesai meski Anda sedang membuka aplikasi lain"
+          >
+            <Bell size={13} />
+            <span>Aktifkan Notifikasi Desktop Saat Selesai</span>
+          </button>
         )}
       </div>
 
@@ -808,10 +866,10 @@ export const FocusRoomPage: React.FC = () => {
         <Card>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
             <Laptop size={18} style={{ color: 'var(--primary)' }} />
-            <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Aturan Multi-Perangkat (PRD 14.3)</h4>
+            <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Aktivitas di Aplikasi Lain (PRD 14.3)</h4>
           </div>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Satu akun hanya boleh memiliki 1 sesi aktif (berjalan atau dijeda). Status server adalah <em>single source of truth</em> yang dilindungi konstrain unik di database PostgreSQL.
+            Berpindah tab atau membuka aplikasi seperti VS Code, browser referensi, atau video tutorial <strong>tidak menjeda</strong> timer. Sesi dihitung presisi berdasarkan waktu nyata dan mengirim notifikasi saat selesai.
           </p>
         </Card>
 

@@ -37,6 +37,8 @@ interface FocusContextType {
   isRunning: boolean;
   isPaused: boolean;
   recentSessions: StudySession[];
+  notificationPermission: NotificationPermission | 'unsupported';
+  requestNotificationPermission: () => Promise<boolean>;
   startSession: (input: StartSessionInput) => Promise<StudySession>;
   pauseSession: () => Promise<void>;
   resumeSession: () => Promise<void>;
@@ -96,6 +98,23 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [loadingActive, setLoadingActive] = useState<boolean>(true);
   const [liveActualSeconds, setLiveActualSeconds] = useState<number>(0);
   const [recentSessions, setRecentSessions] = useState<StudySession[]>([]);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      return Notification.permission;
+    }
+    return 'unsupported';
+  });
+
+  const requestNotificationPermission = useCallback(async (): Promise<boolean> => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    try {
+      const result = await Notification.requestPermission();
+      setNotificationPermission(result);
+      return result === 'granted';
+    } catch {
+      return false;
+    }
+  }, []);
 
   // Refs mutable imperatif: Sumber kebenaran instan untuk loop timer & Web Worker (Bebas Stale Closure)
   const activeSessionRef = useRef<StudySession | null>(null);
@@ -173,6 +192,22 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       playTimerCompletionChime();
       document.title = '✓ Selesai! VLT — Focus Room';
+
+      // Kirim Notifikasi Desktop agar pengguna langsung tahu saat berada di tab/aplikasi lain
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        try {
+          const notifTitle = session.mode === 'work' ? 'Sesi Fokus Selesai! 🎉' : 'Waktu Istirahat Selesai! 🔔';
+          const notifBody = session.mode === 'work'
+            ? (session.title 
+                ? `Target fokus untuk "${session.title}" telah tercapai. Saatnya istirahat sejenak!`
+                : 'Target durasi sesi Pomodoro telah tercapai. Saatnya istirahat sejenak!')
+            : 'Waktu istirahat Anda sudah selesai. Siap untuk kembali produktif?';
+          new Notification(notifTitle, {
+            body: notifBody,
+            icon: '/favicon.ico',
+          });
+        } catch {}
+      }
 
       activeSessionRef.current = null;
       setActiveSession(null);
@@ -485,6 +520,13 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       lastCheckpointMs: now,
     });
 
+    // Minta izin notifikasi browser secara proaktif jika masih default agar alert desktop aktif saat pindah aplikasi
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        Notification.requestPermission().then((res) => setNotificationPermission(res)).catch(() => {});
+      } catch {}
+    }
+
     return created;
   };
 
@@ -603,6 +645,8 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         isRunning: activeSession?.status === 'running',
         isPaused: activeSession?.status === 'paused',
         recentSessions,
+        notificationPermission,
+        requestNotificationPermission,
         startSession,
         pauseSession: pauseSessionAction,
         resumeSession: resumeSessionAction,
