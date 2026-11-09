@@ -8,7 +8,6 @@ import {
   Upload,
   ShieldCheck, 
   Check, 
-  Database,
   RefreshCw,
   CheckCircle2
 } from 'lucide-react';
@@ -104,11 +103,11 @@ export const SettingsPage: React.FC = () => {
         </Badge>
       </div>
 
-      {/* Tema Tampilan (FR-SET-01) */}
+      {/* Tema Tampilan */}
       <Card>
         <div style={{ marginBottom: 16 }}>
           <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, marginBottom: 4 }}>
-            Tema Antarmuka (FR-SET-01)
+            Tema Antarmuka
           </h3>
           <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
             Preferensi tema disimpan secara lokal di browser dan diterapkan langsung tanpa perlu reload.
@@ -167,12 +166,12 @@ export const SettingsPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Preferensi Pomodoro (FR-SET-02) */}
+      {/* Preferensi Pomodoro */}
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <Clock size={20} style={{ color: 'var(--primary)' }} />
           <div>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Preferensi Default Pomodoro (FR-SET-02)</h3>
+            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Preferensi Default Pomodoro</h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Atur durasi default sesi fokus dan waktu jeda</span>
           </div>
         </div>
@@ -237,12 +236,12 @@ export const SettingsPage: React.FC = () => {
         </form>
       </Card>
 
-      {/* Ekspor & Backup (FR-SET-04) */}
+      {/* Ekspor & Backup */}
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <Download size={20} style={{ color: 'var(--accent-cyan)' }} />
           <div>
-            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Ekspor & Backup Data (FR-SET-04)</h3>
+            <h3 style={{ fontSize: '1.0625rem', fontWeight: 700 }}>Ekspor & Backup Data</h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Mencegah kehilangan data sesuai Prinsip Produk #1</span>
           </div>
         </div>
@@ -280,36 +279,6 @@ export const SettingsPage: React.FC = () => {
         </div>
       </Card>
 
-      {/* Status Arsitektur Fondasi */}
-      <Card style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border-subtle)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-          <Database size={18} style={{ color: 'var(--accent-emerald)' }} />
-          <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Status Tahapan Rilis (PRD Bagian 11)</h4>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: '0.8125rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-            <strong>Tahap 1 — Fondasi:</strong> Autentikasi personal Supabase, UI responsif desktop & mobile, Light/Dark/Auto theme.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-            <strong>Tahap 2 — Learning Management:</strong> Parser roadmap JSON v1.0, preview & merge diff, status lesson & progres otomatis.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-            <strong>Tahap 3 — Planning:</strong> Kalender bulanan & agenda, form jadwal fleksibel, deadline terpisah, prioritas harian.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-            <strong>Tahap 4 — Focus Tracking:</strong> Timer Pomodoro aktual berbasis timestamp, pemulihan crash & sleep, anti-sesi ganda.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-emerald)' }} />
-            <strong>Tahap 5 — Analytics & Stabilitas:</strong> Metrik durasi fokus aktual, grafik distribusi harian, konsistensi, backup & pemulihan.
-          </div>
-        </div>
-      </Card>
 
       {/* Restore Modal */}
       {user && (

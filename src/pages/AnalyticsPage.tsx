@@ -4,7 +4,6 @@ import {
   Clock, 
   TrendingUp, 
   Calendar, 
-  Info,
   Award,
   BookOpen,
   Sunrise,
@@ -172,17 +171,6 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
         </div>
       </div>
 
-      {/* Zero Fake Data Notice Banner (FR-ANA-04 & PRD Principle #5) */}
-      <div className="vlt-banner vlt-banner-info">
-        <Info size={20} />
-        <div>
-          <strong style={{ display: 'block', marginBottom: 2 }}>Integritas Data Bersih (FR-ANA-04)</strong>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-            VLT tidak mengisi grafik kosong dengan data simulasi atau streak palsu. Grafik dan ringkasan metrik hanya dihitung 
-            dari sesi fokus yang benar-benar Anda jalani di Focus Room. Hari istirahat diperlakukan secara wajar dan netral.
-          </span>
-        </div>
-      </div>
 
       {/* Primary Metric Cards Summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
@@ -244,7 +232,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 8 }}>
           <div>
             <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>
-              Distribusi Durasi Fokus Harian (FR-ANA-01)
+              Distribusi Durasi Fokus Harian
             </h3>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
               Satuan: Menit Fokus Aktual • Periode: {period === '7d' ? '7 Hari Terakhir' : period === '30d' ? '30 Hari Terakhir' : 'Semua Rekaman'}
