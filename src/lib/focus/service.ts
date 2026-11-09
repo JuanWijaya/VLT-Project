@@ -72,10 +72,52 @@ export async function fetchActiveSession(userId: string): Promise<StudySession |
     const lastHeartbeatMs = new Date(mappedSession.lastHeartbeatAt).getTime();
     const timeSinceLastHeartbeat = nowMs - lastHeartbeatMs;
 
-    if (mappedSession.status === 'running' && timeSinceLastHeartbeat > STALE_HEARTBEAT_THRESHOLD_MS) {
-      // Rekonsiliasi otomatis: tandai sebagai paused di DB tanpa menambah durasi selama jeda mati
-      await pauseSession(userId, mappedSession.id, mappedSession.actualDurationSeconds);
-      mappedSession.status = 'paused';
+    if (mappedSession.status === 'running') {
+      let shouldPause = false;
+
+      if (typeof window !== 'undefined') {
+        const localTrackRaw = localStorage.getItem(`vlt-focus-tracking-${userId}`);
+        let localTrack: any = null;
+        try {
+          if (localTrackRaw) localTrack = JSON.parse(localTrackRaw);
+        } catch {}
+
+        if (localTrack && localTrack.sessionId === mappedSession.id && localTrack.status === 'running' && localTrack.segmentStartTimeMs) {
+          const elapsedSec = Math.floor((nowMs - localTrack.segmentStartTimeMs) / 1000) + (localTrack.baseActualSeconds || 0);
+
+          if (elapsedSec >= mappedSession.targetDurationSeconds) {
+            // Sesi sudah tuntas saat browser di latar belakang!
+            await completeSession(userId, mappedSession.id, mappedSession.targetDurationSeconds);
+            localStorage.removeItem(`vlt-focus-tracking-${userId}`);
+            return null;
+          }
+
+          // Masih dalam batas target sesi Pomodoro dan aktif di browser ini:
+          // Jangan dijeda secara paksa! Perbarui checkpoint & durasi aktual.
+          const cappedElapsed = Math.min(elapsedSec, mappedSession.targetDurationSeconds);
+          mappedSession.actualDurationSeconds = cappedElapsed;
+          mappedSession.lastHeartbeatAt = new Date().toISOString();
+          try {
+            await sendHeartbeatCheckpoint(userId, mappedSession.id, cappedElapsed);
+          } catch {}
+        } else {
+          // Tidak ada tracking lokal di perangkat/browser ini
+          if (timeSinceLastHeartbeat > STALE_HEARTBEAT_THRESHOLD_MS) {
+            shouldPause = true;
+          }
+        }
+      } else {
+        // Lingkungan non-browser (runner pengujian Node.js)
+        if (timeSinceLastHeartbeat > STALE_HEARTBEAT_THRESHOLD_MS) {
+          shouldPause = true;
+        }
+      }
+
+      if (shouldPause) {
+        // Rekonsiliasi otomatis: tandai sebagai paused di DB tanpa menambah durasi selama jeda mati
+        await pauseSession(userId, mappedSession.id, mappedSession.actualDurationSeconds);
+        mappedSession.status = 'paused';
+      }
     }
 
     return mappedSession;

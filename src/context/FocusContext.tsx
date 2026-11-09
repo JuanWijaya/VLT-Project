@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { useAuth } from './AuthContext';
 import { 
   fetchActiveSession, 
@@ -96,129 +97,165 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [liveActualSeconds, setLiveActualSeconds] = useState<number>(0);
   const [recentSessions, setRecentSessions] = useState<StudySession[]>([]);
 
-  // Ref penjejakan waktu aktual berbasis wall-clock timestamp (tahan background tab throttling)
+  // Refs mutable imperatif: Sumber kebenaran instan untuk loop timer & Web Worker (Bebas Stale Closure)
+  const activeSessionRef = useRef<StudySession | null>(null);
+  const userRef = useRef<User | null>(user);
   const segmentStartTimeRef = useRef<number | null>(null);
   const baseActualSecondsRef = useRef<number>(0);
+  const liveActualSecondsRef = useRef<number>(0);
   const lastHeartbeatTimeRef = useRef<number>(Date.now());
   const workerRef = useRef<Worker | null>(null);
-  const fallbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isCompletingRef = useRef<boolean>(false);
+
+  // Selalu sinkronkan refs dengan state
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  useEffect(() => {
+    activeSessionRef.current = activeSession;
+  }, [activeSession]);
 
   // Simpan state penjejakan lokal ke localStorage
   const saveLocalTrackingState = useCallback((state: LocalSessionTrackingState | null) => {
-    if (!user) return;
+    if (!userRef.current) return;
     try {
       if (state) {
-        localStorage.setItem(LOCAL_FOCUS_TRACKING_KEY(user.id), JSON.stringify(state));
+        localStorage.setItem(LOCAL_FOCUS_TRACKING_KEY(userRef.current.id), JSON.stringify(state));
       } else {
-        localStorage.removeItem(LOCAL_FOCUS_TRACKING_KEY(user.id));
+        localStorage.removeItem(LOCAL_FOCUS_TRACKING_KEY(userRef.current.id));
       }
     } catch {}
-  }, [user]);
+  }, []);
 
   // Muat state penjejakan lokal dari localStorage
   const getLocalTrackingState = useCallback((): LocalSessionTrackingState | null => {
-    if (!user) return null;
+    if (!userRef.current) return null;
     try {
-      const raw = localStorage.getItem(LOCAL_FOCUS_TRACKING_KEY(user.id));
+      const raw = localStorage.getItem(LOCAL_FOCUS_TRACKING_KEY(userRef.current.id));
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
-  }, [user]);
-
-  // ---------------------------------------------------------------------------
-  // 1. Inisialisasi Active Session & Sinkronisasi Wall-Clock
-  // ---------------------------------------------------------------------------
-  const refreshActiveSession = useCallback(async () => {
-    if (!user) {
-      setActiveSession(null);
-      setLiveActualSeconds(0);
-      setLoadingActive(false);
-      return;
-    }
-
-    try {
-      const active = await fetchActiveSession(user.id);
-      setActiveSession(active);
-
-      if (active) {
-        const localTrack = getLocalTrackingState();
-        if (active.status === 'running') {
-          // Jika di localStorage tercatat running untuk sesi ini, hitung durasi sebenarnya sejak segment start
-          if (localTrack && localTrack.sessionId === active.id && localTrack.segmentStartTimeMs) {
-            baseActualSecondsRef.current = localTrack.baseActualSeconds;
-            segmentStartTimeRef.current = localTrack.segmentStartTimeMs;
-            const now = Date.now();
-            const elapsed = Math.floor((now - localTrack.segmentStartTimeMs) / 1000);
-            const total = localTrack.baseActualSeconds + elapsed;
-            setLiveActualSeconds(total);
-          } else {
-            // Sesi baru di-load dari server
-            baseActualSecondsRef.current = active.actualDurationSeconds;
-            segmentStartTimeRef.current = Date.now();
-            setLiveActualSeconds(active.actualDurationSeconds);
-            saveLocalTrackingState({
-              sessionId: active.id,
-              userId: user.id,
-              status: 'running',
-              baseActualSeconds: active.actualDurationSeconds,
-              segmentStartTimeMs: Date.now(),
-              targetDurationSeconds: active.targetDurationSeconds,
-              lastCheckpointMs: Date.now(),
-            });
-          }
-        } else {
-          // Status paused
-          baseActualSecondsRef.current = active.actualDurationSeconds;
-          segmentStartTimeRef.current = null;
-          setLiveActualSeconds(active.actualDurationSeconds);
-          saveLocalTrackingState({
-            sessionId: active.id,
-            userId: user.id,
-            status: 'paused',
-            baseActualSeconds: active.actualDurationSeconds,
-            segmentStartTimeMs: null,
-            targetDurationSeconds: active.targetDurationSeconds,
-            lastCheckpointMs: Date.now(),
-          });
-        }
-      } else {
-        segmentStartTimeRef.current = null;
-        baseActualSecondsRef.current = 0;
-        setLiveActualSeconds(0);
-        saveLocalTrackingState(null);
-      }
-    } catch (err) {
-      console.warn('[VLT FocusContext] Gagal memuat active session:', err);
-    } finally {
-      setLoadingActive(false);
-    }
-  }, [user, getLocalTrackingState, saveLocalTrackingState]);
+  }, []);
 
   const refreshRecentSessions = useCallback(async () => {
-    if (!user) return;
+    const currentUser = userRef.current;
+    if (!currentUser) return;
     try {
-      const history = await fetchRecentSessions(user.id, 10);
+      const history = await fetchRecentSessions(currentUser.id, 10);
       setRecentSessions(history);
     } catch (err) {
       console.warn('[VLT FocusContext] Gagal memuat riwayat sesi:', err);
     }
-  }, [user]);
-
-  // Load awal saat user terautentikasi
-  useEffect(() => {
-    refreshActiveSession();
-    refreshRecentSessions();
-  }, [refreshActiveSession, refreshRecentSessions]);
+  }, []);
 
   // ---------------------------------------------------------------------------
-  // 2. Web Worker Timer Engine (Tahan Throttling Tab di Background)
+  // 1. Eksekusi Tuntas Sesi Fokus Normal (Tepat di target duration, tidak bablas)
+  // ---------------------------------------------------------------------------
+  const handleAutoCompletion = useCallback(async () => {
+    if (isCompletingRef.current) return;
+    isCompletingRef.current = true;
+
+    const session = activeSessionRef.current;
+    const currentUser = userRef.current;
+    if (!session || !currentUser) {
+      isCompletingRef.current = false;
+      return;
+    }
+
+    try {
+      // Hentikan worker
+      if (workerRef.current) workerRef.current.postMessage('stop');
+
+      // Tuntaskan di database dengan durasi target pas (misal 25 menit = 1500 detik)
+      await apiCompleteSession(currentUser.id, session.id, session.targetDurationSeconds);
+
+      playTimerCompletionChime();
+      document.title = '✓ Selesai! VLT — Focus Room';
+
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      segmentStartTimeRef.current = null;
+      baseActualSecondsRef.current = 0;
+      liveActualSecondsRef.current = 0;
+      setLiveActualSeconds(0);
+      saveLocalTrackingState(null);
+
+      await refreshRecentSessions();
+    } catch (err) {
+      console.error('[VLT FocusContext] Gagal auto-complete sesi:', err);
+    } finally {
+      isCompletingRef.current = false;
+    }
+  }, [saveLocalTrackingState, refreshRecentSessions]);
+
+  // ---------------------------------------------------------------------------
+  // 2. Handler Setiap Detik (Tick): Menggunakan Refs Imperatif Bebas Stale Closure
+  // ---------------------------------------------------------------------------
+  const handleTimerTick = useCallback(async () => {
+    const session = activeSessionRef.current;
+    const currentUser = userRef.current;
+    const segmentStart = segmentStartTimeRef.current;
+
+    if (!session || session.status !== 'running' || !segmentStart || !currentUser) {
+      return;
+    }
+
+    const now = Date.now();
+    const segmentElapsed = Math.max(0, Math.floor((now - segmentStart) / 1000));
+    const currentTotal = baseActualSecondsRef.current + segmentElapsed;
+
+    // SANGAT PENTING: Kunci durasi aktual maksimal tepat pada targetDurationSeconds!
+    // Tidak boleh pernah melebihi target (misal target 25 menit tidak boleh tembus 27 menit)
+    const cappedTotal = Math.min(currentTotal, session.targetDurationSeconds);
+    liveActualSecondsRef.current = cappedTotal;
+    setLiveActualSeconds(cappedTotal);
+
+    // Update judul tab browser secara real-time
+    const remaining = Math.max(0, session.targetDurationSeconds - cappedTotal);
+    document.title = `(${formatTimeDisplay(remaining)}) VLT — Focus`;
+
+    // 1. Cek apakah sesi fokus sudah mencapai target waktu
+    if (currentTotal >= session.targetDurationSeconds) {
+      await handleAutoCompletion();
+      return;
+    }
+
+    // 2. Checkpoint ke server/database setiap HEARTBEAT_INTERVAL_MS (10 detik)
+    if (now - lastHeartbeatTimeRef.current >= HEARTBEAT_INTERVAL_MS) {
+      lastHeartbeatTimeRef.current = now;
+      saveLocalTrackingState({
+        sessionId: session.id,
+        userId: currentUser.id,
+        status: 'running',
+        baseActualSeconds: baseActualSecondsRef.current,
+        segmentStartTimeMs: segmentStart,
+        targetDurationSeconds: session.targetDurationSeconds,
+        lastCheckpointMs: now,
+      });
+
+      try {
+        await sendHeartbeatCheckpoint(currentUser.id, session.id, cappedTotal);
+      } catch {
+        // Fallback offline tersimpan di local tracking state
+      }
+    }
+  }, [handleAutoCompletion, saveLocalTrackingState]);
+
+  // Hubungkan tick ref ke handler terbaru
+  const tickFnRef = useRef<() => void>(handleTimerTick);
+  useEffect(() => {
+    tickFnRef.current = handleTimerTick;
+  }, [handleTimerTick]);
+
+  // ---------------------------------------------------------------------------
+  // 3. Web Worker Background Engine & Main-Thread Synchronous Interval
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     try {
-      // Inisialisasi inline Web Worker yang berjalan di thread terpisah (kebal pembekuan tab Chrome/Edge)
       const workerCode = `
         let timerId = null;
         self.onmessage = function(e) {
@@ -239,7 +276,7 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       worker.onmessage = (e) => {
         if (e.data === 'tick') {
-          handleTimerTick();
+          tickFnRef.current();
         }
       };
     } catch (err) {
@@ -251,88 +288,28 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         workerRef.current.terminate();
         workerRef.current = null;
       }
-      if (fallbackIntervalRef.current) {
-        clearInterval(fallbackIntervalRef.current);
-        fallbackIntervalRef.current = null;
-      }
     };
   }, []);
 
-  // Handler setiap detik dari Web Worker / fallback
-  const handleTimerTick = useCallback(async () => {
-    if (!activeSession || activeSession.status !== 'running' || !segmentStartTimeRef.current || !user) {
-      return;
+  // Interval sinkron di main-thread: Menjamin angka detik di layar berjalan mulus 100% tanpa lag
+  useEffect(() => {
+    if (activeSession && activeSession.status === 'running') {
+      const interval = setInterval(() => {
+        tickFnRef.current();
+      }, 1000);
+      return () => clearInterval(interval);
     }
-
-    const now = Date.now();
-    const segmentElapsed = Math.floor((now - segmentStartTimeRef.current) / 1000);
-    const currentTotal = baseActualSecondsRef.current + segmentElapsed;
-    setLiveActualSeconds(currentTotal);
-
-    // Perbarui judul tab browser agar sisa waktu terlihat saat di tab lain
-    const remaining = Math.max(0, activeSession.targetDurationSeconds - currentTotal);
-    document.title = `(${formatTimeDisplay(remaining)}) VLT — Focus`;
-
-    // 1. Cek apakah sesi fokus sudah mencapai target waktu secara normal
-    if (currentTotal >= activeSession.targetDurationSeconds) {
-      // Hentikan timer dan selesaikan sesi secara otomatis
-      if (workerRef.current) workerRef.current.postMessage('stop');
-      if (fallbackIntervalRef.current) clearInterval(fallbackIntervalRef.current);
-
-      try {
-        await apiCompleteSession(user.id, activeSession.id, activeSession.targetDurationSeconds);
-        playTimerCompletionChime();
-        document.title = '✓ Selesai! VLT — Focus';
-        setActiveSession(null);
-        segmentStartTimeRef.current = null;
-        baseActualSecondsRef.current = 0;
-        setLiveActualSeconds(0);
-        saveLocalTrackingState(null);
-        refreshRecentSessions();
-      } catch (err) {
-        console.error('[VLT FocusContext] Gagal menyelesaikan sesi otomatis:', err);
-      }
-      return;
-    }
-
-    // 2. Checkpoint ke server/database setiap HEARTBEAT_INTERVAL_MS (10 detik)
-    if (now - lastHeartbeatTimeRef.current >= HEARTBEAT_INTERVAL_MS) {
-      lastHeartbeatTimeRef.current = now;
-      saveLocalTrackingState({
-        sessionId: activeSession.id,
-        userId: user.id,
-        status: 'running',
-        baseActualSeconds: baseActualSecondsRef.current,
-        segmentStartTimeMs: segmentStartTimeRef.current,
-        targetDurationSeconds: activeSession.targetDurationSeconds,
-        lastCheckpointMs: now,
-      });
-
-      try {
-        await sendHeartbeatCheckpoint(user.id, activeSession.id, currentTotal);
-      } catch (err) {
-        // Fallback offline disimpan di local tracking state
-      }
-    }
-  }, [activeSession, user, saveLocalTrackingState, refreshRecentSessions]);
+  }, [activeSession]);
 
   // Kendalikan start/stop worker sesuai status activeSession
   useEffect(() => {
     if (activeSession && activeSession.status === 'running') {
       if (workerRef.current) {
         workerRef.current.postMessage('start');
-      } else {
-        if (!fallbackIntervalRef.current) {
-          fallbackIntervalRef.current = setInterval(handleTimerTick, 1000);
-        }
       }
     } else {
       if (workerRef.current) {
         workerRef.current.postMessage('stop');
-      }
-      if (fallbackIntervalRef.current) {
-        clearInterval(fallbackIntervalRef.current);
-        fallbackIntervalRef.current = null;
       }
       if (!activeSession) {
         document.title = 'VLT — Velgryn Learning Tracking';
@@ -341,61 +318,166 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         document.title = `[Dijeda ${formatTimeDisplay(remaining)}] VLT — Focus`;
       }
     }
-  }, [activeSession, handleTimerTick, liveActualSeconds]);
+  }, [activeSession, liveActualSeconds]);
 
   // ---------------------------------------------------------------------------
-  // 3. Listener Visibilitas Tab Browser (document.visibilitychange)
+  // 4. Inisialisasi Active Session saat User Login / Reload
+  // ---------------------------------------------------------------------------
+  const refreshActiveSession = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser) {
+      activeSessionRef.current = null;
+      setActiveSession(null);
+      setLiveActualSeconds(0);
+      setLoadingActive(false);
+      return;
+    }
+
+    try {
+      const active = await fetchActiveSession(currentUser.id);
+      activeSessionRef.current = active;
+      setActiveSession(active);
+
+      if (active) {
+        const localTrack = getLocalTrackingState();
+        if (active.status === 'running') {
+          if (localTrack && localTrack.sessionId === active.id && localTrack.segmentStartTimeMs) {
+            baseActualSecondsRef.current = localTrack.baseActualSeconds;
+            segmentStartTimeRef.current = localTrack.segmentStartTimeMs;
+            const now = Date.now();
+            const elapsed = Math.floor((now - localTrack.segmentStartTimeMs) / 1000);
+            const total = localTrack.baseActualSeconds + elapsed;
+            const capped = Math.min(total, active.targetDurationSeconds);
+            liveActualSecondsRef.current = capped;
+            setLiveActualSeconds(capped);
+
+            // Jika sudah mencapai target saat dibuka kembali:
+            if (total >= active.targetDurationSeconds) {
+              await handleAutoCompletion();
+              return;
+            }
+          } else {
+            baseActualSecondsRef.current = active.actualDurationSeconds;
+            segmentStartTimeRef.current = Date.now();
+            liveActualSecondsRef.current = active.actualDurationSeconds;
+            setLiveActualSeconds(active.actualDurationSeconds);
+            saveLocalTrackingState({
+              sessionId: active.id,
+              userId: currentUser.id,
+              status: 'running',
+              baseActualSeconds: active.actualDurationSeconds,
+              segmentStartTimeMs: Date.now(),
+              targetDurationSeconds: active.targetDurationSeconds,
+              lastCheckpointMs: Date.now(),
+            });
+          }
+        } else {
+          // Status paused
+          baseActualSecondsRef.current = active.actualDurationSeconds;
+          segmentStartTimeRef.current = null;
+          liveActualSecondsRef.current = active.actualDurationSeconds;
+          setLiveActualSeconds(active.actualDurationSeconds);
+          saveLocalTrackingState({
+            sessionId: active.id,
+            userId: currentUser.id,
+            status: 'paused',
+            baseActualSeconds: active.actualDurationSeconds,
+            segmentStartTimeMs: null,
+            targetDurationSeconds: active.targetDurationSeconds,
+            lastCheckpointMs: Date.now(),
+          });
+        }
+      } else {
+        segmentStartTimeRef.current = null;
+        baseActualSecondsRef.current = 0;
+        liveActualSecondsRef.current = 0;
+        setLiveActualSeconds(0);
+        saveLocalTrackingState(null);
+      }
+    } catch (err) {
+      console.warn('[VLT FocusContext] Gagal memuat active session:', err);
+    } finally {
+      setLoadingActive(false);
+    }
+  }, [getLocalTrackingState, saveLocalTrackingState, handleAutoCompletion]);
+
+  useEffect(() => {
+    refreshActiveSession();
+    refreshRecentSessions();
+  }, [refreshActiveSession, refreshRecentSessions]);
+
+  // ---------------------------------------------------------------------------
+  // 5. Listener Visibilitas Tab Browser (document.visibilitychange)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (typeof document === 'undefined' || !user) return;
+    if (typeof document === 'undefined') return;
 
     const handleVisibilityChange = async () => {
-      if (!activeSession || activeSession.status !== 'running' || !segmentStartTimeRef.current) {
+      const session = activeSessionRef.current;
+      const currentUser = userRef.current;
+      const segmentStart = segmentStartTimeRef.current;
+
+      if (!session || session.status !== 'running' || !segmentStart || !currentUser) {
         return;
       }
 
       const now = Date.now();
-      const segmentElapsed = Math.floor((now - segmentStartTimeRef.current) / 1000);
+      const segmentElapsed = Math.max(0, Math.floor((now - segmentStart) / 1000));
       const currentTotal = baseActualSecondsRef.current + segmentElapsed;
+      const cappedTotal = Math.min(currentTotal, session.targetDurationSeconds);
 
-      if (document.visibilityState === 'visible') {
-        // Saat pengguna kembali ke tab VLT: langsung update tampilan seketika dengan wall-clock time
-        setLiveActualSeconds(currentTotal);
-        lastHeartbeatTimeRef.current = now;
-        try {
-          await sendHeartbeatCheckpoint(user.id, activeSession.id, currentTotal);
-        } catch {}
-      } else if (document.visibilityState === 'hidden') {
-        // Saat pengguna berpindah ke tab/aplikasi lain: simpan checkpoint langsung ke DB
-        try {
-          await sendHeartbeatCheckpoint(user.id, activeSession.id, currentTotal);
-        } catch {}
+      liveActualSecondsRef.current = cappedTotal;
+      setLiveActualSeconds(cappedTotal);
+
+      // Jika waktu telah habis selama tab di latar belakang, tuntaskan seketika!
+      if (currentTotal >= session.targetDurationSeconds) {
+        await handleAutoCompletion();
+        return;
       }
+
+      // Kirim sinkronisasi seketika
+      lastHeartbeatTimeRef.current = now;
+      saveLocalTrackingState({
+        sessionId: session.id,
+        userId: currentUser.id,
+        status: 'running',
+        baseActualSeconds: baseActualSecondsRef.current,
+        segmentStartTimeMs: segmentStart,
+        targetDurationSeconds: session.targetDurationSeconds,
+        lastCheckpointMs: now,
+      });
+
+      try {
+        await sendHeartbeatCheckpoint(currentUser.id, session.id, cappedTotal);
+      } catch {}
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user, activeSession]);
+  }, [handleAutoCompletion, saveLocalTrackingState]);
 
   // ---------------------------------------------------------------------------
-  // 4. Action Methods: Start, Pause, Resume, Stop Early, Cancel
+  // 6. Action Methods: Start, Pause, Resume, Stop Early, Cancel
   // ---------------------------------------------------------------------------
   const startSession = async (input: StartSessionInput): Promise<StudySession> => {
-    if (!user) throw new Error('Pengguna belum terautentikasi.');
+    const currentUser = userRef.current;
+    if (!currentUser) throw new Error('Pengguna belum terautentikasi.');
 
-    const created = await startStudySession(user.id, input);
+    const created = await startStudySession(currentUser.id, input);
     const now = Date.now();
     baseActualSecondsRef.current = 0;
     segmentStartTimeRef.current = now;
     lastHeartbeatTimeRef.current = now;
+    liveActualSecondsRef.current = 0;
     setLiveActualSeconds(0);
+    activeSessionRef.current = created;
     setActiveSession(created);
 
     saveLocalTrackingState({
       sessionId: created.id,
-      userId: user.id,
+      userId: currentUser.id,
       status: 'running',
       baseActualSeconds: 0,
       segmentStartTimeMs: now,
@@ -407,68 +489,85 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const pauseSessionAction = async (): Promise<void> => {
-    if (!user || !activeSession) return;
+    const session = activeSessionRef.current;
+    const currentUser = userRef.current;
+    if (!currentUser || !session) return;
 
     const now = Date.now();
     const segmentElapsed = segmentStartTimeRef.current 
-      ? Math.floor((now - segmentStartTimeRef.current) / 1000) 
+      ? Math.max(0, Math.floor((now - segmentStartTimeRef.current) / 1000)) 
       : 0;
-    const finalActual = baseActualSecondsRef.current + segmentElapsed;
+    const finalActual = Math.min(session.targetDurationSeconds, baseActualSecondsRef.current + segmentElapsed);
 
-    await apiPauseSession(user.id, activeSession.id, finalActual);
+    if (workerRef.current) workerRef.current.postMessage('stop');
+
+    await apiPauseSession(currentUser.id, session.id, finalActual);
 
     baseActualSecondsRef.current = finalActual;
     segmentStartTimeRef.current = null;
+    liveActualSecondsRef.current = finalActual;
     setLiveActualSeconds(finalActual);
-    setActiveSession(prev => prev ? { ...prev, status: 'paused', actualDurationSeconds: finalActual } : null);
+    const updated = { ...session, status: 'paused' as SessionStatus, actualDurationSeconds: finalActual };
+    activeSessionRef.current = updated;
+    setActiveSession(updated);
 
     saveLocalTrackingState({
-      sessionId: activeSession.id,
-      userId: user.id,
+      sessionId: session.id,
+      userId: currentUser.id,
       status: 'paused',
       baseActualSeconds: finalActual,
       segmentStartTimeMs: null,
-      targetDurationSeconds: activeSession.targetDurationSeconds,
+      targetDurationSeconds: session.targetDurationSeconds,
       lastCheckpointMs: now,
     });
   };
 
   const resumeSessionAction = async (): Promise<void> => {
-    if (!user || !activeSession) return;
+    const session = activeSessionRef.current;
+    const currentUser = userRef.current;
+    if (!currentUser || !session) return;
 
-    await apiResumeSession(user.id, activeSession.id);
+    await apiResumeSession(currentUser.id, session.id);
 
     const now = Date.now();
-    baseActualSecondsRef.current = liveActualSeconds;
+    baseActualSecondsRef.current = liveActualSecondsRef.current;
     segmentStartTimeRef.current = now;
     lastHeartbeatTimeRef.current = now;
-    setActiveSession(prev => prev ? { ...prev, status: 'running' } : null);
+    const updated = { ...session, status: 'running' as SessionStatus };
+    activeSessionRef.current = updated;
+    setActiveSession(updated);
 
     saveLocalTrackingState({
-      sessionId: activeSession.id,
-      userId: user.id,
+      sessionId: session.id,
+      userId: currentUser.id,
       status: 'running',
-      baseActualSeconds: liveActualSeconds,
+      baseActualSeconds: liveActualSecondsRef.current,
       segmentStartTimeMs: now,
-      targetDurationSeconds: activeSession.targetDurationSeconds,
+      targetDurationSeconds: session.targetDurationSeconds,
       lastCheckpointMs: now,
     });
   };
 
   const stopEarlySessionAction = async (): Promise<void> => {
-    if (!user || !activeSession) return;
+    const session = activeSessionRef.current;
+    const currentUser = userRef.current;
+    if (!currentUser || !session) return;
 
     const now = Date.now();
     const segmentElapsed = segmentStartTimeRef.current 
-      ? Math.floor((now - segmentStartTimeRef.current) / 1000) 
+      ? Math.max(0, Math.floor((now - segmentStartTimeRef.current) / 1000)) 
       : 0;
-    const finalActual = baseActualSecondsRef.current + segmentElapsed;
+    const finalActual = Math.min(session.targetDurationSeconds, baseActualSecondsRef.current + segmentElapsed);
 
-    await apiCompleteSession(user.id, activeSession.id, finalActual);
+    if (workerRef.current) workerRef.current.postMessage('stop');
 
+    await apiCompleteSession(currentUser.id, session.id, finalActual);
+
+    activeSessionRef.current = null;
     setActiveSession(null);
     segmentStartTimeRef.current = null;
     baseActualSecondsRef.current = 0;
+    liveActualSecondsRef.current = 0;
     setLiveActualSeconds(0);
     saveLocalTrackingState(null);
     document.title = 'VLT — Velgryn Learning Tracking';
@@ -476,13 +575,19 @@ export const FocusProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const cancelSessionAction = async (): Promise<void> => {
-    if (!user || !activeSession) return;
+    const session = activeSessionRef.current;
+    const currentUser = userRef.current;
+    if (!currentUser || !session) return;
 
-    await apiCancelSession(user.id, activeSession.id);
+    if (workerRef.current) workerRef.current.postMessage('stop');
 
+    await apiCancelSession(currentUser.id, session.id);
+
+    activeSessionRef.current = null;
     setActiveSession(null);
     segmentStartTimeRef.current = null;
     baseActualSecondsRef.current = 0;
+    liveActualSecondsRef.current = 0;
     setLiveActualSeconds(0);
     saveLocalTrackingState(null);
     document.title = 'VLT — Velgryn Learning Tracking';
@@ -519,4 +624,3 @@ export const useFocus = (): FocusContextType => {
   }
   return context;
 };
-
