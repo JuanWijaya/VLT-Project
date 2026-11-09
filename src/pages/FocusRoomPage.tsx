@@ -6,9 +6,7 @@ import {
   RotateCcw, 
   Coffee, 
   Flame, 
-  Laptop, 
   ShieldAlert, 
-  CheckCircle,
   Clock,
   BookOpen,
   AlertTriangle,
@@ -173,9 +171,6 @@ export const FocusRoomPage: React.FC = () => {
       }}>
         <div>
           <h2 style={{ fontSize: '1.375rem', fontWeight: 800 }}>Focus Room (Pomodoro Timer)</h2>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-            Menjalankan sesi fokus terukur. Waktu jeda dan waktu aplikasi tertutup tidak dihitung sebagai waktu fokus.
-          </p>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -861,38 +856,6 @@ export const FocusRoomPage: React.FC = () => {
         )}
       </Card>
 
-      {/* Rules & Architecture Notice Cards (PRD Section 14.3) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 18 }}>
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <Laptop size={18} style={{ color: 'var(--primary)' }} />
-            <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Aktivitas di Aplikasi Lain (PRD 14.3)</h4>
-          </div>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Berpindah tab atau membuka aplikasi seperti VS Code, browser referensi, atau video tutorial <strong>tidak menjeda</strong> timer. Sesi dihitung presisi berdasarkan waktu nyata dan mengirim notifikasi saat selesai.
-          </p>
-        </Card>
-
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <ShieldAlert size={18} style={{ color: 'var(--accent-amber)' }} />
-            <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Pemulihan Crash & Sleep</h4>
-          </div>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Sesi melakukan checkpoint otomatis setiap 10 detik. Jika aplikasi ditutup atau komputer tidur, sesi otomatis dipulihkan sebagai <strong>"dijeda"</strong> dan tidak menghitung durasi saat tidur sebagai waktu fokus.
-          </p>
-        </Card>
-
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-            <CheckCircle size={18} style={{ color: 'var(--accent-emerald)' }} />
-            <h4 style={{ fontSize: '0.9375rem', fontWeight: 700 }}>Pemisahan Tugas & Sesi</h4>
-          </div>
-          <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Menyelesaikan sesi Pomodoro <strong>tidak</strong> otomatis menyelesaikan status lesson. Riwayat waktu fokus tetap aman tersimpan meskipun struktur materi diubah.
-          </p>
-        </Card>
-      </div>
 
       {/* Confirmation Modal: Selesai Lebih Awal (Stop Early) */}
       {confirmStopOpen && (

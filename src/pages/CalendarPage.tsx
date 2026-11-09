@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   Circle,
   Plus,
-  Info,
   Trash2,
   Edit2,
   BookOpen,
@@ -359,17 +358,6 @@ export const CalendarPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Distinction Rules Banner (FR-CAL-04 & FR-CAL-05) */}
-      <div className="vlt-banner vlt-banner-info">
-        <Info size={18} style={{ flexShrink: 0 }} />
-        <div>
-          <strong style={{ display: 'block', marginBottom: 2 }}>Prinsip Inti: Rencana vs Realisasi (FR-CAL-04 & 05)</strong>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-            <strong>Jadwal:</strong> kapan Anda berencana belajar. <strong>Deadline:</strong> target batas waktu akhir (disimpan terpisah, bukan durasi belajar). 
-            Menandai jadwal atau deadline selesai <em>tidak otomatis</em> mengubah status lesson di roadmap menjadi selesai.
-          </span>
-        </div>
-      </div>
 
       {/* Error Banner */}
       {error && (
@@ -903,12 +891,7 @@ export const CalendarPage: React.FC = () => {
             })}
           </div>
 
-          {/* Footer Note */}
-          <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--border-subtle)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
-              * Catatan PRD: Menyelesaikan jadwal atau deadline tidak otomatis menandai lesson selesai. Lesson hanya selesai jika pengguna menandainya secara sadar di My Learning.
-            </div>
-          </div>
+
         </Card>
       </div>
 

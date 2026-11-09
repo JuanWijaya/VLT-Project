@@ -644,11 +644,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <div style={{ fontSize: '2.25rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
               {todayFocusMinutes} <span style={{ fontSize: '1rem', fontWeight: 500, color: 'var(--text-tertiary)' }}>menit</span>
             </div>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 4 }}>
-              {todaySessionCount > 0 
-                ? `Tercatat dari ${todaySessionCount} sesi fokus Pomodoro hari ini. Waktu jeda dan istirahat tidak dihitung.`
-                : 'Belum ada sesi fokus yang tercatat hari ini. Mulai sesi Pomodoro pertama Anda di Focus Room.'}
-            </p>
+            {todaySessionCount === 0 && (
+              <p style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+                Belum ada sesi fokus yang tercatat hari ini. Mulai sesi Pomodoro pertama Anda di Focus Room.
+              </p>
+            )}
             <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
               <button 
                 onClick={() => onNavigate('focus')}
