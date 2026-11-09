@@ -7,8 +7,7 @@ import {
   BarChart3, 
   Settings,
   Layers,
-  LogOut,
-  ShieldCheck
+  LogOut
 } from 'lucide-react';
 import type { NavPage } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -112,20 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentPage, onNavigate }) => 
           </div>
         )}
 
-        <div className="foundation-badge">
-          <div className="status-dot-pulse" />
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.75rem' }}>Tahap 2A: Supabase Ready</div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)' }}>Auth & RLS Protected</div>
-          </div>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-tertiary)', padding: '0 4px' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <ShieldCheck size={13} style={{ color: 'var(--accent-emerald)' }} /> Single-User MVP
-          </span>
-          <span>v1.1.0-alpha</span>
-        </div>
       </div>
     </aside>
   );

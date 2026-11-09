@@ -91,13 +91,9 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, onSelect }) => {
         borderTop: '1px solid var(--border-subtle)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-end',
         marginTop: 'auto',
       }}>
-        <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-          ID: {course.stableId}
-        </span>
-
         <button
           onClick={() => onSelect(course)}
           className="vlt-btn vlt-btn-subtle vlt-btn-sm"

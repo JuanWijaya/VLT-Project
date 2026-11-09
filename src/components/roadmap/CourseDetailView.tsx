@@ -170,9 +170,6 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
           <Badge variant={isCompleted ? 'emerald' : 'primary'} icon={<Sparkles size={12} />}>
             {isCompleted ? 'Course Selesai' : 'Roadmap Aktif'}
           </Badge>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            Stable ID: {course.stableId}
-          </span>
         </div>
 
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>

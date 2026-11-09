@@ -361,7 +361,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
               <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>
-                Pola Jam Fokus Efektif (FR-ANA-03)
+                Pola Jam Fokus Efektif
               </h3>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
                 Distribusi waktu berdasarkan rentang jam harian
@@ -462,7 +462,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ onNavigate }) => {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
             <div>
               <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0 }}>
-                Progres & Waktu per Course (FR-ANA-02)
+                Progres & Waktu per Course
               </h3>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
                 Perbandingan progres roadmap dan alokasi waktu fokus
