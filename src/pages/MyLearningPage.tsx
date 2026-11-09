@@ -3,10 +3,7 @@ import {
   FileJson, 
   Upload, 
   Layers, 
-  CheckCircle, 
-  BookOpen, 
-  AlertCircle,
-  HelpCircle
+  BookOpen
 } from 'lucide-react';
 import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
@@ -234,27 +231,6 @@ export const MyLearningPage: React.FC = () => {
             </div>
           )}
 
-          {/* Business Rule Checklist (Informative) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16, marginTop: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--bg-subtle)' }}>
-              <CheckCircle size={16} style={{ color: 'var(--accent-emerald)', marginTop: 2, flexShrink: 0 }} />
-              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>3 Status Lesson:</strong> Belum dimulai, Sedang dipelajari, Selesai (dapat diubah manual).
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--bg-subtle)' }}>
-              <AlertCircle size={16} style={{ color: 'var(--accent-amber)', marginTop: 2, flexShrink: 0 }} />
-              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>Preview & Merge:</strong> Impor ulang tidak menimpa status belajar tanpa konfirmasi eksplisit.
-              </div>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--bg-subtle)' }}>
-              <HelpCircle size={16} style={{ color: 'var(--accent-cyan)', marginTop: 2, flexShrink: 0 }} />
-              <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                <strong style={{ color: 'var(--text-primary)' }}>Progres Otomatis:</strong> (Lesson selesai ÷ total lesson) × 100%, semua berbobot setara.
-              </div>
-            </div>
-          </div>
         </>
       )}
 
