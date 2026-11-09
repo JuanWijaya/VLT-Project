@@ -38,9 +38,6 @@ export const CourseCard: React.FC<CourseCardProps> = ({ course, onSelect }) => {
           <Badge variant={isCompleted ? 'emerald' : 'primary'}>
             {course.progressPercentage}% Selesai
           </Badge>
-          <span style={{ fontSize: '0.6875rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            v{course.schemaVersion}
-          </span>
         </div>
       </div>
 

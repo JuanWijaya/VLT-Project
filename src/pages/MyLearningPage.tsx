@@ -89,16 +89,9 @@ export const MyLearningPage: React.FC = () => {
           }}>
             <div>
               <h2 style={{ fontSize: '1.375rem', fontWeight: 800 }}>My Learning & Roadmap Management</h2>
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                Pengelolaan roadmap mandiri berbasis file JSON v1.0 dan pelacakan progres aktual.
-              </p>
             </div>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Badge variant="primary" icon={<FileJson size={13} />}>
-                Schema v1.0
-              </Badge>
-
               <button
                 onClick={() => setIsImportModalOpen(true)}
                 className="vlt-btn vlt-btn-primary"
@@ -222,9 +215,6 @@ export const MyLearningPage: React.FC = () => {
                     Course Aktif ({courses.length})
                   </h3>
                 </div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                  Data tersinkronisasi via Supabase RLS
-                </span>
               </div>
 
               {/* Grid Cards Course */}

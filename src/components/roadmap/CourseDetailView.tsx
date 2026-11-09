@@ -173,10 +173,6 @@ export const CourseDetailView: React.FC<CourseDetailViewProps> = ({
           <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
             Stable ID: {course.stableId}
           </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>•</span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            v{course.schemaVersion}
-          </span>
         </div>
 
         <h2 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>
