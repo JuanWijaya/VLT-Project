@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { FocusProvider } from './context/FocusContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginPage } from './components/auth/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -83,7 +84,9 @@ export const App: React.FC = () => {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <MainAppContent />
+        <FocusProvider>
+          <MainAppContent />
+        </FocusProvider>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -23,7 +23,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
       {/* Main Content Area */}
       <div className="main-content-area">
-        <Header currentPage={currentPage} />
+        <Header currentPage={currentPage} onNavigate={onNavigate} />
         
         <main className="page-wrapper animate-fade-in" key={currentPage}>
           {children}

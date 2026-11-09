@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Play, 
   Pause, 
@@ -20,33 +20,32 @@ import { Card } from '../components/common/Card';
 import { Badge } from '../components/common/Badge';
 import { EmptyState } from '../components/common/EmptyState';
 import { useAuth } from '../context/AuthContext';
+import { useFocus } from '../context/FocusContext';
 import { 
   fetchCoursesWithLessons, 
   type CourseOption,
   formatTimeLocal 
 } from '../lib/calendar/service';
-import { 
-  fetchActiveSession, 
-  startStudySession, 
-  sendHeartbeatCheckpoint, 
-  pauseSession, 
-  resumeSession, 
-  completeSession, 
-  cancelSession, 
-  fetchRecentSessions,
-  HEARTBEAT_INTERVAL_MS 
-} from '../lib/focus/service';
 import type { 
-  StudySession, 
   FocusMode 
 } from '../types/focus';
 
 export const FocusRoomPage: React.FC = () => {
   const { user } = useAuth();
+  const {
+    activeSession,
+    liveActualSeconds,
+    loadingActive,
+    recentSessions,
+    startSession,
+    pauseSession,
+    resumeSession,
+    stopEarlySession,
+    cancelSession,
+    refreshActiveSession,
+    refreshRecentSessions,
+  } = useFocus();
 
-  // Active Session & Recovery State
-  const [activeSession, setActiveSession] = useState<StudySession | null>(null);
-  const [loadingActive, setLoadingActive] = useState<boolean>(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
@@ -60,123 +59,18 @@ export const FocusRoomPage: React.FC = () => {
   const [selectedLessonId, setSelectedLessonId] = useState<string>('');
   const [courseOptions, setCourseOptions] = useState<CourseOption[]>([]);
 
-  // Live Timer Tracking State (Timestamp-based)
-  const [liveActualSeconds, setLiveActualSeconds] = useState<number>(0);
-  const segmentStartTimeRef = useRef<number | null>(null);
-  const baseActualSecondsRef = useRef<number>(0);
-  const lastHeartbeatTimeRef = useRef<number>(Date.now());
-
-  // Recent Sessions History
-  const [recentSessions, setRecentSessions] = useState<StudySession[]>([]);
-
   // Stop / Cancel Confirmation Dialogs
   const [confirmStopOpen, setConfirmStopOpen] = useState<boolean>(false);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState<boolean>(false);
 
-  // ---------------------------------------------------------------------------
-  // 1. Inisialisasi Data: Load Course Options & Active Session
-  // ---------------------------------------------------------------------------
-  const loadInitialData = useCallback(async () => {
+  // Load course options
+  useEffect(() => {
     if (!user) return;
-    setLoadingActive(true);
-    setErrorMessage(null);
-    try {
-      const [active, courses, history] = await Promise.all([
-        fetchActiveSession(user.id),
-        fetchCoursesWithLessons(user.id),
-        fetchRecentSessions(user.id, 8),
-      ]);
-      setActiveSession(active);
-      setCourseOptions(courses);
-      setRecentSessions(history);
-
-      if (active) {
-        baseActualSecondsRef.current = active.actualDurationSeconds;
-        setLiveActualSeconds(active.actualDurationSeconds);
-        if (active.status === 'running') {
-          segmentStartTimeRef.current = Date.now();
-        } else {
-          segmentStartTimeRef.current = null;
-        }
-      }
-    } catch (err) {
-      console.error('[FocusRoom] Gagal memuat status sesi:', err);
-      setErrorMessage(err instanceof Error ? err.message : 'Gagal memuat status sesi fokus.');
-    } finally {
-      setLoadingActive(false);
-    }
+    fetchCoursesWithLessons(user.id)
+      .then(setCourseOptions)
+      .catch((err) => console.warn('[FocusRoom] Gagal memuat opsi kursus:', err));
   }, [user]);
 
-  useEffect(() => {
-    loadInitialData();
-  }, [loadInitialData]);
-
-  // ---------------------------------------------------------------------------
-  // 2. Timestamp-driven Loop & Heartbeat Checkpoint (PRD 14.3)
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!activeSession || activeSession.status !== 'running') {
-      segmentStartTimeRef.current = null;
-      return;
-    }
-
-    if (!segmentStartTimeRef.current) {
-      segmentStartTimeRef.current = Date.now();
-    }
-
-    const interval = setInterval(async () => {
-      if (!segmentStartTimeRef.current || !activeSession) return;
-
-      const now = Date.now();
-      const segmentElapsed = Math.floor((now - segmentStartTimeRef.current) / 1000);
-      const currentTotalSeconds = baseActualSecondsRef.current + segmentElapsed;
-      setLiveActualSeconds(currentTotalSeconds);
-
-      // Cek apakah target waktu sudah tercapai
-      if (currentTotalSeconds >= activeSession.targetDurationSeconds) {
-        clearInterval(interval);
-        handleNormalSessionCompleted(activeSession, currentTotalSeconds);
-        return;
-      }
-
-      // Checkpoint ke DB / server setiap HEARTBEAT_INTERVAL_MS (10 detik)
-      if (user && (now - lastHeartbeatTimeRef.current >= HEARTBEAT_INTERVAL_MS)) {
-        lastHeartbeatTimeRef.current = now;
-        try {
-          await sendHeartbeatCheckpoint(user.id, activeSession.id, currentTotalSeconds);
-        } catch (err) {
-          console.warn('[FocusRoom] Gagal mengirim heartbeat checkpoint:', err);
-        }
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
-  }, [activeSession, user]);
-
-  // ---------------------------------------------------------------------------
-  // 3. Listener Penutupan Tab & Perpindahan Visibilitas (PRD FR-FOCUS-05)
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    if (!user || !activeSession || activeSession.status !== 'running') return;
-
-    const handleBeforeUnload = () => {
-      // Saat tab atau browser hendak ditutup, simpan checkpoint durasi terakhir dan jeda sesi
-      if (segmentStartTimeRef.current) {
-        const segmentElapsed = Math.floor((Date.now() - segmentStartTimeRef.current) / 1000);
-        const finalActual = baseActualSecondsRef.current + segmentElapsed;
-        pauseSession(user.id, activeSession.id, finalActual);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [user, activeSession]);
-
-  // ---------------------------------------------------------------------------
-  // 4. Action Handlers: Start, Pause, Resume, Stop Early, Cancel
-  // ---------------------------------------------------------------------------
   const handleStartSession = async () => {
     if (!user) return;
     setActionLoading(true);
@@ -187,19 +81,13 @@ export const FocusRoomPage: React.FC = () => {
       : targetMinutes * 60;
 
     try {
-      const created = await startStudySession(user.id, {
+      await startSession({
         mode: selectedMode,
         targetDurationSeconds: targetSec,
         courseId: selectedCourseId || null,
         lessonId: selectedLessonId || null,
         title: sessionTitle.trim() || undefined,
       });
-
-      baseActualSecondsRef.current = 0;
-      segmentStartTimeRef.current = Date.now();
-      lastHeartbeatTimeRef.current = Date.now();
-      setLiveActualSeconds(0);
-      setActiveSession(created);
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : 'Gagal memulai sesi fokus.');
     } finally {
@@ -208,14 +96,9 @@ export const FocusRoomPage: React.FC = () => {
   };
 
   const handlePause = async () => {
-    if (!user || !activeSession) return;
     setActionLoading(true);
     try {
-      const finalActual = liveActualSeconds;
-      await pauseSession(user.id, activeSession.id, finalActual);
-      baseActualSecondsRef.current = finalActual;
-      segmentStartTimeRef.current = null;
-      setActiveSession(prev => prev ? { ...prev, status: 'paused', actualDurationSeconds: finalActual } : null);
+      await pauseSession();
     } catch (err) {
       setErrorMessage('Gagal menjeda sesi fokus.');
     } finally {
@@ -224,14 +107,9 @@ export const FocusRoomPage: React.FC = () => {
   };
 
   const handleResume = async () => {
-    if (!user || !activeSession) return;
     setActionLoading(true);
     try {
-      await resumeSession(user.id, activeSession.id);
-      baseActualSecondsRef.current = liveActualSeconds;
-      segmentStartTimeRef.current = Date.now();
-      lastHeartbeatTimeRef.current = Date.now();
-      setActiveSession(prev => prev ? { ...prev, status: 'running' } : null);
+      await resumeSession();
     } catch (err) {
       setErrorMessage('Gagal melanjutkan sesi fokus.');
     } finally {
@@ -240,19 +118,10 @@ export const FocusRoomPage: React.FC = () => {
   };
 
   const handleStopEarlyConfirm = async () => {
-    if (!user || !activeSession) return;
     setActionLoading(true);
     setConfirmStopOpen(false);
     try {
-      const finalActual = liveActualSeconds;
-      await completeSession(user.id, activeSession.id, finalActual);
-      setActiveSession(null);
-      segmentStartTimeRef.current = null;
-      baseActualSecondsRef.current = 0;
-      setLiveActualSeconds(0);
-      // Muat ulang riwayat
-      const updatedHistory = await fetchRecentSessions(user.id, 8);
-      setRecentSessions(updatedHistory);
+      await stopEarlySession();
     } catch (err) {
       setErrorMessage('Gagal menyelesaikan sesi fokus.');
     } finally {
@@ -261,41 +130,14 @@ export const FocusRoomPage: React.FC = () => {
   };
 
   const handleCancelSessionConfirm = async () => {
-    if (!user || !activeSession) return;
     setActionLoading(true);
     setConfirmCancelOpen(false);
     try {
-      await cancelSession(user.id, activeSession.id);
-      setActiveSession(null);
-      segmentStartTimeRef.current = null;
-      baseActualSecondsRef.current = 0;
-      setLiveActualSeconds(0);
-      const updatedHistory = await fetchRecentSessions(user.id, 8);
-      setRecentSessions(updatedHistory);
+      await cancelSession();
     } catch (err) {
       setErrorMessage('Gagal membatalkan sesi fokus.');
     } finally {
       setActionLoading(false);
-    }
-  };
-
-  const handleNormalSessionCompleted = async (session: StudySession, totalActual: number) => {
-    if (!user) return;
-    try {
-      await completeSession(user.id, session.id, totalActual);
-      setActiveSession(null);
-      segmentStartTimeRef.current = null;
-      baseActualSecondsRef.current = 0;
-      setLiveActualSeconds(0);
-      alert(
-        session.mode === 'work' 
-          ? `🎉 Sesi fokus selesai! Waktu fokus aktual ${Math.floor(totalActual / 60)} menit berhasil dicatat.` 
-          : '☕ Waktu istirahat selesai! Siap untuk sesi fokus berikutnya?'
-      );
-      const updatedHistory = await fetchRecentSessions(user.id, 8);
-      setRecentSessions(updatedHistory);
-    } catch (err) {
-      console.error('[FocusRoom] Gagal menyelesaikan sesi:', err);
     }
   };
 
@@ -352,7 +194,10 @@ export const FocusRoomPage: React.FC = () => {
           <button
             type="button"
             className="vlt-btn vlt-btn-secondary"
-            onClick={loadInitialData}
+            onClick={() => {
+              refreshActiveSession();
+              refreshRecentSessions();
+            }}
             title="Sinkronkan status dari server"
             style={{ padding: '6px 12px', fontSize: '0.8125rem' }}
           >

@@ -1,21 +1,31 @@
 import React from 'react';
-import { Sun, Moon, Layers, ShieldCheck, LogOut } from 'lucide-react';
+import { Sun, Moon, Layers, ShieldCheck, LogOut, Flame } from 'lucide-react';
 import type { NavPage } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useFocus } from '../../context/FocusContext';
 import { navigationItems } from './Sidebar';
 
 interface HeaderProps {
   currentPage: NavPage;
+  onNavigate?: (page: NavPage) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ currentPage }) => {
+export const Header: React.FC<HeaderProps> = ({ currentPage, onNavigate }) => {
   const { resolvedTheme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
+  const { activeSession, liveActualSeconds, isRunning } = useFocus();
   const currentItem = navigationItems.find((item) => item.id === currentPage);
 
   const userInitial = user?.email ? user.email.charAt(0).toUpperCase() : 'V';
   const displayEmail = user?.email || 'Self-Use Mode';
+
+  const remainingSeconds = activeSession 
+    ? Math.max(0, activeSession.targetDurationSeconds - liveActualSeconds) 
+    : 0;
+  const remMinutes = Math.floor(remainingSeconds / 60);
+  const remSecs = remainingSeconds % 60;
+  const timerFormatted = `${String(remMinutes).padStart(2, '0')}:${String(remSecs).padStart(2, '0')}`;
 
   const handleLogout = async () => {
     if (window.confirm('Apakah Anda yakin ingin keluar dari sesi VLT?')) {
@@ -45,6 +55,40 @@ export const Header: React.FC<HeaderProps> = ({ currentPage }) => {
       </div>
 
       <div className="header-right">
+        {/* Active Focus Mini-Timer Pill */}
+        {activeSession && (
+          <button
+            onClick={() => onNavigate?.('focus')}
+            style={{
+              padding: '5px 12px',
+              borderRadius: 'var(--radius-full)',
+              background: isRunning ? 'var(--accent-amber-subtle)' : 'var(--bg-subtle)',
+              border: `1px solid ${isRunning ? 'rgba(245, 158, 11, 0.4)' : 'var(--border-subtle)'}`,
+              color: isRunning ? 'var(--accent-amber-text)' : 'var(--text-secondary)',
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 7,
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
+            }}
+            title="Sesi fokus aktif. Klik untuk membuka Focus Room."
+          >
+            <Flame 
+              size={14} 
+              style={{ 
+                color: isRunning ? 'var(--accent-amber)' : 'var(--text-tertiary)',
+              }} 
+            />
+            <span>{timerFormatted}</span>
+            <span style={{ fontSize: '0.6875rem', fontWeight: 500, fontFamily: 'var(--font-sans)', opacity: 0.85 }}>
+              {activeSession.status === 'paused' ? 'Dijeda' : (activeSession.mode === 'work' ? 'Fokus' : 'Break')}
+            </span>
+          </button>
+        )}
+
         {/* Status pill: Personal Self-Use */}
         <div className="user-status-pill" title={`Terautentikasi: ${displayEmail}`}>
           <ShieldCheck size={14} style={{ color: 'var(--accent-emerald)' }} />
